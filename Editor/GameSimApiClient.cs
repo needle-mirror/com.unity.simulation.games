@@ -122,7 +122,7 @@ namespace Unity.Simulation.Games.Editor
 #pragma warning restore CS0649
     internal static class Utils
     {
-        internal const string pacakgeVersion = "0.4.1-preview.3";
+        internal const string pacakgeVersion = "0.4.1-preview.4";
 
         internal static Dictionary<string, string> GetAuthHeader(string tokenString)
         {

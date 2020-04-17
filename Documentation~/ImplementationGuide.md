@@ -12,7 +12,7 @@ The following overall steps are required to implement the Game Simulation packag
 These steps are described in detail below.
 
 ## Step 1. Installing the Game Simulation package
-1. To download the Game Simulation package, add the following line to your project's dependencies in your `manifest.json` file:<br /> `"com.unity.simulation.games": "0.4.0-preview",`
+1. To download the Game Simulation package, add the following line to your project's dependencies in your `manifest.json` file:<br /> `"com.unity.simulation.games": "0.4.1-preview.4",`
 
 ## Step 2. Creating parameters in Game Simulation for each grid search parameter
 1. From the Editor, open the **Game Simulation** window (**Window** > **Game Simulation**).
