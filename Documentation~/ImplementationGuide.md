@@ -12,7 +12,7 @@ The following overall steps are required to implement the Game Simulation packag
 These steps are described in detail below.
 
 ## Step 1. Installing the Game Simulation package
-1. To download the Game Simulation package, add the following line to your project's dependencies in your `manifest.json` file:<br /> `"com.unity.simulation.games": "0.4.1-preview.4",`
+1. To download the Game Simulation package, add the following line to your project's dependencies in your `manifest.json` file:<br /> `"com.unity.simulation.games": "0.4.1-preview.6",`
 
 ## Step 2. Creating parameters in Game Simulation for each grid search parameter
 1. From the Editor, open the **Game Simulation** window (**Window** > **Game Simulation**).
@@ -63,13 +63,20 @@ This example uses a racing game which tracks lap count and finishing time.
 3. Verify that there is a file called `counters_0.json` in your system’s default `Application.persistentDataPath`. If you are using a Mac, this should be `~/Library/Application Support/Unity Technologies/`.
 
 ## Step 6. Uploading your build to Game Simulation
-You must be whitelisted to upload your builds to Game Simulation. To get whitelisted, contact [gamesimulation@unity3d.com](mailto:gamesimulation@unity3d.com).
-
-1. In the **Build Settings** window (**File** > **Build Settings**), make sure the **Scenes in Build** area lists all the scenes you would like to include in your build.
+1. In the **Project Settings** window (**Edit** > **Project Settings**), select **Player** in the menu. Make sure **Run in Background** is checked and **Display Resolution Dialog** is set to "Disabled".
+2. In the **Build Settings** window (**File** > **Build Settings**), make sure the **Scenes in Build** area lists all the scenes you would like to include in your build.
    1. To add scenes, open the scenes in the Editor and click **Add Open Scenes** in the **Build Settings** window.
-2. Close the **Build Settings** window.
-3. Click the **Build Upload** tab in the **Game Simulation** window.
-4. Select the scenes to include in your build.
-5. Name your build.
-6. Click **Build and Upload**.
-7. Click **Create Simulation** (or navigate directly to the [Dashboard](https://gamesimulation.unity3d.com)) to run a simulation from the Web UI. 
+3. Close the **Build Settings** window.
+4. Click the **Build Upload** tab in the **Game Simulation** window.
+5. Select the scenes to include in your build.
+6. Name your build.
+7. Click **Build and Upload**.
+8. Click **Create Simulation** (or navigate directly to the [Dashboard](https://gamesimulation.unity3d.com)) to run a simulation from the Web UI. 
+
+In order to execute a simulation from the dashboard, your Unity organization must be turned on to the free tier. It usually takes about 1 week after signing up.  If you receive a "Maximum Simulation Minutes Exceeded" warning in the dashboard, please email [gamesimulation@unity3d.com](mailto:gamesimulation@unity3d.com).
+
+## Step 7. Access the Dashboard
+Please refer to the [Dashboard Guide](https://unity-technologies.github.io/gamesimulation/Docs/dashboard.html)
+
+## GameSim APIs
+If you need more information on the GameSim APIs, please refer to the GameSim APIs [document](https://unity-technologies.github.io/gamesimulation/Docs/gamesim-apis.html)

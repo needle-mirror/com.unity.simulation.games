@@ -33,3 +33,7 @@ Additional requirements to implement and use Game Simulation:
 Additionally, make sure you have the following design and experimentation questions:
 * A list of all parameters you would like to evaluate
 * A list of all metrics you would like to measure, which will show up on the Game Simulation results page in the Web UI.<br /> **Note**: only metrics stored as type Long are supported
+
+## Additional documentation
+* [FAQ](https://unity-technologies.github.io/gamesimulation/Docs/FAQ.html)
+* [Dashboard Documentation](https://unity-technologies.github.io/gamesimulation/Docs/dashboard.html)
