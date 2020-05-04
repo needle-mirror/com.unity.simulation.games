@@ -5,6 +5,11 @@ All notable changes to this package will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.4.1-preview.7] - 2020-05-04
+
+## This is the v0.4.1-preview.6 release of *Unity Game Simulation*
+- Actually updated Unity Simulation Core package to `0.0.10-preview.11` due to a bug in `0.0.10-preview.10`.
+
 ## [0.4.1-preview.6] - 2020-05-01
 
 ## This is the v0.4.1-preview.6 release of *Unity Game Simulation*
