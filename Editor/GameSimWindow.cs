@@ -395,14 +395,14 @@ namespace Unity.Simulation.Games.Editor
 
         void DrawButtons(Rect rect)
         {
-            string buildNamePattern = @"^[a-zA-Z0-9]*$";
+            string buildNamePattern = @"^[a-zA-Z0-9]{2,63}$";
             Regex rgx = new Regex(buildNamePattern);
 
             EditorGUI.BeginDisabledGroup(string.IsNullOrEmpty(buildName) || !rgx.IsMatch(buildName) || selectedScenesCount == 0);
 
             if (string.IsNullOrEmpty(buildName) || !rgx.IsMatch(buildName))
             {
-                EditorGUI.HelpBox(new Rect(rect.x + 50, rect.y + k_LineHeight + 5, rect.width - 100, k_LineHeight), "Invalid Build Name", MessageType.Error);
+                EditorGUI.HelpBox(new Rect(rect.x + 50, rect.y + k_LineHeight + 5, rect.width - 100, k_LineHeight), "Names must be between 2 and 63 characters long and can only contain alpha numeric characters.", MessageType.Error);
             }
 
             if(GUI.Button(new Rect((rect.width - 150)/2, rect.y, 150, k_LineHeight), "Build and Upload"))
@@ -430,6 +430,8 @@ namespace Unity.Simulation.Games.Editor
             var displayResolutionDialog = PlayerSettings.displayResolutionDialog;
             PlayerSettings.displayResolutionDialog = ResolutionDialogSetting.Disabled;
 #endif
+            var runInBackground = PlayerSettings.runInBackground;
+            PlayerSettings.runInBackground = true;
 
             BuildPlayerOptions buildPlayerOptions = new BuildPlayerOptions();
             buildPlayerOptions.locationPathName = Path.Combine(savePath, name + ".x86_64");
@@ -443,6 +445,7 @@ namespace Unity.Simulation.Games.Editor
 #if !UNITY_2019_1_OR_NEWER
             PlayerSettings.displayResolutionDialog = displayResolutionDialog;
 #endif
+            PlayerSettings.runInBackground = runInBackground;
 
             if (summary.result == BuildResult.Succeeded)
             {

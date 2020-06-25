@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Text;
 using System.Collections.Generic;
+using Newtonsoft.Json;
 using UnityEngine;
 
 namespace Unity.Simulation.Games
@@ -41,15 +42,19 @@ namespace Unity.Simulation.Games
 
         internal Counter GetCounter(string name)
         {
-            lock (_mutex)
+            if (!_counters.ContainsKey(name))
             {
-                if (!_counters.ContainsKey(name))
+                lock (_mutex)
                 {
-                    var counter = new Counter(name);
-                    _counters[name] = counter;
+                    // Verify the counter still doesn't exist after acquiring the lock
+                    if (!_counters.ContainsKey(name))
+                    {
+                        var counter = new Counter(name);
+                        _counters[name] = counter;
+                    }
                 }
-                return _counters[name];
             }
+            return _counters[name];
         }
 
         /// <summary>
@@ -87,6 +92,51 @@ namespace Unity.Simulation.Games
             SetCounter(name, 0);
         }
 
+        /// <summary>
+        /// Snapshots the current values of all counters and labels them. 
+        /// Label will append a numeric value if it is not unique.
+        /// </summary>
+        /// <param name="label">Label to tag counter values with</param>
+        public void SnapshotCounters(string label)
+        {
+            int i = 0;
+            string uniqueLabel = label;
+            while (_snapshotLabels.Contains(uniqueLabel))
+            {
+                uniqueLabel = label + '-' + i;
+                i++;
+            }
+            _snapshotLabels.Add(uniqueLabel);
+            
+            lock (_mutex)
+            {
+                foreach (var kvp in _counters)
+                {
+                    Counter c = GetCounter(kvp.Key);
+                    c.Snapshot(uniqueLabel);
+                }
+            }
+        }
+        
+        /// <summary>
+        /// Enable step series metrics for a list of counters captured at the specified cadence.
+        /// The minimum interval is 15 seconds, if a smaller value is provided it will be increased to the minimum.
+        /// </summary>
+        /// <param name="intervalSeconds">The number of seconds between each snapshot. Must be 15 or more seconds.</param>
+        /// <param name="counterNames">A list of counter names to track at the same cadence</param>
+        public void CaptureStepSeries(int intervalSeconds, string counterName)
+        {
+            if (intervalSeconds < 15)
+            {
+                Debug.LogWarning("Interval seconds must be at least 15, using the minimum value instead.");
+                intervalSeconds = 15;
+            }
+
+            var counter = GetCounter(counterName);
+            counter.CaptureStepSeries(intervalSeconds);
+            TickManager.Enable();
+        }
+
         //
         // Non-public
         //
@@ -94,7 +144,9 @@ namespace Unity.Simulation.Games
         object _mutex = new object();
 
         Dictionary<string, Counter> _counters = new Dictionary<string, Counter>();
-
+        
+        HashSet<string> _snapshotLabels = new HashSet<string>();
+        
         GameSimManager()
         {
             Log.I("Initializing the Game Simulation package");
@@ -104,13 +156,17 @@ namespace Unity.Simulation.Games
         static readonly GameSimManager _instance = new GameSimManager();
 
         [Serializable]
-        struct Counters
+        struct CountersData
         {
             public Metadata metadata;
             public Counter[] items;
-            public Counters(int size, Metadata metadata)
+
+            public CountersData(Dictionary<string,Counter> counters, Metadata metadata)
             {
-                items = new Counter[size];
+                items = new Counter[counters.Count];
+                int index = 0;
+                foreach (var kvp in counters)
+                    items[index++] = counters[kvp.Key];
                 this.metadata = metadata;
             }
         }
@@ -122,11 +178,11 @@ namespace Unity.Simulation.Games
             public string attemptId;
             public string gameSimSettings;
 
-            public Metadata(string instanceId, string attemptId)
+            public Metadata(string instanceId, string attemptId, string gameSimSettings)
             {
                 this.instanceId = instanceId;
                 this.attemptId = attemptId;
-                this.gameSimSettings = "";
+                this.gameSimSettings = gameSimSettings;
             }
         }
 
@@ -204,24 +260,24 @@ namespace Unity.Simulation.Games
 
             lock (_mutex)
             {
-                Counters counters = new Counters(_counters.Count, new Metadata()
+                Metadata metadata = new Metadata(
+                    Configuration.Instance.GetInstanceId(),
+                    Configuration.Instance.GetAttemptId(),
+                    AddMetaData?.Invoke()
+                );
+                
+                CountersData counters = new CountersData(_counters, metadata);
+                json = JsonConvert.SerializeObject(counters, new JsonSerializerSettings
                 {
-                    attemptId = Configuration.Instance.GetAttemptId(),
-                    instanceId = Configuration.Instance.GetInstanceId(),
-                    gameSimSettings = AddMetaData?.Invoke()
+                    NullValueHandling = NullValueHandling.Ignore
                 });
-
-                int index = 0;
-                foreach (var kvp in _counters)
-                    counters.items[index++] = _counters[kvp.Key];
-                json = JsonUtility.ToJson(counters);
             }
 
+            Log.I("Writing the GameSim Counters files..");
             if (json != null)
             {
-                Log.I("Writing the GameSim Counters file..");
-                var fileName = "counters_" + _countersSequence.ToString() + ".json";
-                FileProducer.Write(Path.Combine(Manager.Instance.GetDirectoryFor("GameSim"), fileName), Encoding.ASCII.GetBytes(json));
+                var filename = "counters_" + _countersSequence + ".json";
+                FileProducer.Write(Path.Combine(Manager.Instance.GetDirectoryFor("GameSim"), filename), Encoding.ASCII.GetBytes(json));
                 _countersSequence++;
             }
         }

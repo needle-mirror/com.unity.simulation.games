@@ -14,7 +14,7 @@
     "optionalUnityReferences": [
         "TestAssemblies"
     ],
-    "autoReferenced": false,
+    "autoReferenced": true,
     "defineConstraints": [
         "UNITY_INCLUDE_TESTS"
     ],

@@ -12,12 +12,12 @@ The following overall steps are required to implement the Game Simulation packag
 These steps are described in detail below.
 
 ## Step 1. Installing the Game Simulation package
-1. To download the Game Simulation package, add the following line to your project's dependencies in your `manifest.json` file:<br /> `"com.unity.simulation.games": "0.4.1-preview.7",`
+1. To download the Game Simulation package, add the following line to your project's dependencies in your `manifest.json` file:<br /> `"com.unity.simulation.games": "0.4.3-preview.1",`
 
 ## Step 2. Creating parameters in Game Simulation for each grid search parameter
 1. From the Editor, open the **Game Simulation** window (**Window** > **Game Simulation**).
 2. Add an entry for each parameter that you would like to be able to test with Game Simulation.
-   1. Choose a name, type, and default value for each parameter.<br />**Note**: If you’ve already done this in the **Remote Config** window, you don't need to re-create them.
+   1. Choose a name, type, and default value for each parameter.<br />**Note**: Please use a valid default value.  This will be used during Build Verification to ensure the build is working properly when it is uploaded into Game Simulation.
 3. Press **Save** when done.<br />
 **Note**: Game Simulation updates the values for these parameters in each simulation instance, based on the options specified in the Game Simulation web UI. If your build is run outside of Game Simulation, these parameters use the value from the **Default Value** field. Therefore, put an appropriate default value for each parameter.
 
@@ -25,17 +25,24 @@ These steps are described in detail below.
 Before each run of your simulation, Game Simulation decides on a set of parameter values to evaluate. At runtime, your game must retrieve the set of parameter values for evaluation and then set variables in your game to those values. To fetch the parameter values, call `GameSimManager.Instance.FetchConfig(Action<GameSimConfigResponse>)`. This is included in the Game Simulation package. 
 
 To load parameters into your game:
-1. Fetch this run’s set of parameter values with `GameSimManager.Instance`’s `FetchConfig` method at game start. This stores this run’s parameter values in a `GameSimConfigResponse` object.
-2. Set game variables to the values now stored in the `GameSimConfigResponse` object. Access the variables stored in `GameSimConfigResponse` with
+1. Ensure you can access the Game Simulation types with `using Unity.Simulation.Games;`.
+2. Fetch this run’s set of parameter values with `GameSimManager.Instance`’s `FetchConfig` method at game start. This stores this run’s parameter values in a `GameSimConfigResponse` object.
+3. Set game variables to the values now stored in the `GameSimConfigResponse` object. Access the variables stored in `GameSimConfigResponse` with
 `GameSimConfigResponse.Get[variable type]("key name");`
 
 ## Step 4. Enabling tracking of metrics
-Game Simulation uses a counter to track metrics throughout each run of your game. When the simulation ends, you can download these metrics in both raw and aggregated forms from the Game Simulation web UI.
+Game Simulation uses a counter to track metrics throughout each run of your game. You can set, increase, and reset a counter's value at any point of your game code. 
+You can also take a snapshot of all the counters with a label at a specific point. For example, when a level or a session completes. 
+In addition, you can snapshot a counter at a specific time interval with the minimum interval of 15 seconds. 
+Once the simulation completes, you can download these metrics in both raw and aggregated forms from the Game Simulation [Dashboard](https://gamesimulation.unity3d.com).
+
 
 ### Example implementation
 This example uses a racing game which tracks lap count and finishing time.
 
-1. Call `IncrementCounter` or `SetCounter` to update counter values. If no counter is found with the supplied `name`, it is created, initialized to 0, then either incremented or set as appropriate.
+#### Call `IncrementCounter` or `SetCounter` to update counter values. 
+
+If no counter is found with the supplied `name`, it is created, initialized to 0, then either incremented or set as appropriate.
 ```
    void OnLapFinish()
    {        
@@ -48,13 +55,40 @@ This example uses a racing game which tracks lap count and finishing time.
    }
 ```
 
-2. Call `Application.Quit()`.
+#### (Optional) Call `Reset` to reset the counter to 0.
 ```
    void OnFinish()
    {        
       GameSimManager.Instance.Reset("finishingTime", getFinishingTime());
       Application.Quit()
    }
+```
+
+#### (Optional) Snapshot all counters at a specific point in time
+
+Call `SnapshotCounters(label)` to snapshot all counters at that point in time and record their values marked with the provided label. 
+The metrics will be aggregated across all runs grouped by the label and counter name.
+
+In this example, we take a snapshot of all the counters when the the racing game session 1 ends. OnSessionOneFinish is a dummy method created for the demo. 
+When the `SnapshotCounter` method is called, all counters including lap count and finishing time's current values will be recorded with label "session-1".
+```
+ void OnSessionOneFinish()
+   {        
+      GameSimManager.Instance.SnapshotCounters("session-1");
+   }
+``` 
+
+#### (Optional) Snapshot specific counter at a specified interval
+
+Call`CaptureStepSeries(intervalSeconds, <counterName>)` to capture the provided counter’s value at the specified cadence in seconds, with a minimum interval of 15s.
+Note, if the interval is shorter than 15 seconds, it will be automatically increased to the minimum 15 seconds.
+
+In this example, we set up to snapshot the lap count every 15 seconds when the game starts.
+```
+  void Start()
+      {
+          GameSimManager.Instance.CaptureStepSeries(15, "lapCount");
+      }
 ```
 
 ## Step 5. Testing your implementation
