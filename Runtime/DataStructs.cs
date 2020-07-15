@@ -1,7 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using Unity.RemoteConfig;
-using UnityEngine;
+﻿using System;
 
 namespace Unity.Simulation.Games
 {
@@ -18,7 +15,11 @@ namespace Unity.Simulation.Games
         /// <returns>Integer representing the value of the key. Defaults to 0 if the key is not found.</returns>
         public int GetInt(string key, int defaultValue = 0)
         {
-            return ConfigManager.appConfig.GetInt(key, defaultValue);
+#if UNITY_GAME_SIMULATION || UNITY_EDITOR
+            return RemoteConfigProvider.Instance.configManager.appConfig.GetInt(key, defaultValue);
+#else
+            return 0;
+#endif
         }
 
         /// <summary>
@@ -29,7 +30,11 @@ namespace Unity.Simulation.Games
         /// <returns>Bool representing the value of the key. Defaults to false if the key is not found.</returns>
         public bool GetBool(string key, bool defaultValue = false)
         {
-            return ConfigManager.appConfig.GetBool(key, defaultValue);
+#if UNITY_GAME_SIMULATION || UNITY_EDITOR
+            return RemoteConfigProvider.Instance.configManager.appConfig.GetBool(key, defaultValue);
+#else
+            return false;
+#endif
         }
 
         /// <summary>
@@ -40,7 +45,11 @@ namespace Unity.Simulation.Games
         /// <returns>Float representing the value of the key. Defaults to 0f if the key is not found.</returns>
         public float GetFloat(string key, float defaultValue = 0f)
         {
-            return ConfigManager.appConfig.GetFloat(key, defaultValue);
+#if UNITY_GAME_SIMULATION || UNITY_EDITOR
+            return RemoteConfigProvider.Instance.configManager.appConfig.GetFloat(key, defaultValue);
+#else
+            return float.NaN;
+#endif
         }
 
         /// <summary>
@@ -51,7 +60,11 @@ namespace Unity.Simulation.Games
         /// <returns>Long representing the value of the key. Defaults to 0L if the key is not found.</returns>
         public long GetLong(string key, long defaultValue = 0L)
         {
-            return ConfigManager.appConfig.GetLong(key, defaultValue);
+#if UNITY_GAME_SIMULATION || UNITY_EDITOR
+            return RemoteConfigProvider.Instance.configManager.appConfig.GetLong(key, defaultValue);
+#else
+            return 0;
+#endif
         }
 
         /// <summary>
@@ -62,7 +75,11 @@ namespace Unity.Simulation.Games
         /// <returns>String representing the value of the key. Defaults to "" if the key is not found.</returns>
         public string GetString(string key, string defaultValue = "")
         {
-            return ConfigManager.appConfig.GetString(key, defaultValue);
+#if UNITY_GAME_SIMULATION || UNITY_EDITOR
+            return RemoteConfigProvider.Instance.configManager.appConfig.GetString(key, defaultValue);
+#else
+            return string.Empty;
+#endif
         }
     }
 }

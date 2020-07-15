@@ -9,13 +9,10 @@ namespace Unity.Simulation.Games
 {
     public class GameSimManager
     {
-        public static GameSimManager Instance
-        {
-            get
-            {
-                return _instance;
-            }
-        }
+        private static GameSimManager _instance;
+        public static GameSimManager Instance => _instance ?? (_instance = new GameSimManager());
+        
+#if UNITY_GAME_SIMULATION || UNITY_EDITOR
 
         internal string RunId { get; }
 
@@ -56,6 +53,8 @@ namespace Unity.Simulation.Games
             }
             return _counters[name];
         }
+        
+#endif
 
         /// <summary>
         /// Increment the counter with a certain number
@@ -64,10 +63,12 @@ namespace Unity.Simulation.Games
         /// <param name="amount">Amount by which to increment the counter.</param>
         public void IncrementCounter(string name, Int64 amount)
         {
+#if UNITY_GAME_SIMULATION || UNITY_EDITOR
             if (!_isShuttingDown)
             {
                 GetCounter(name).Increment(amount);
             }
+#endif
         }
 
         /// <summary>
@@ -77,10 +78,12 @@ namespace Unity.Simulation.Games
         /// <param name="value">Value to set the counter to.</param>
         public void SetCounter(string name, Int64 value)
         {
+#if UNITY_GAME_SIMULATION || UNITY_EDITOR
             if (!_isShuttingDown)
             {
                 GetCounter(name).Reset(value);
             }
+#endif
         }
 
         /// <summary>
@@ -89,7 +92,9 @@ namespace Unity.Simulation.Games
         /// <param name="name">Name of the counter</param>
         public void ResetCounter(string name)
         {
+#if UNITY_GAME_SIMULATION || UNITY_EDITOR
             SetCounter(name, 0);
+#endif
         }
 
         /// <summary>
@@ -99,6 +104,7 @@ namespace Unity.Simulation.Games
         /// <param name="label">Label to tag counter values with</param>
         public void SnapshotCounters(string label)
         {
+#if UNITY_GAME_SIMULATION || UNITY_EDITOR
             int i = 0;
             string uniqueLabel = label;
             while (_snapshotLabels.Contains(uniqueLabel))
@@ -116,6 +122,7 @@ namespace Unity.Simulation.Games
                     c.Snapshot(uniqueLabel);
                 }
             }
+#endif
         }
         
         /// <summary>
@@ -126,6 +133,7 @@ namespace Unity.Simulation.Games
         /// <param name="counterNames">A list of counter names to track at the same cadence</param>
         public void CaptureStepSeries(int intervalSeconds, string counterName)
         {
+#if UNITY_GAME_SIMULATION || UNITY_EDITOR
             if (intervalSeconds < 15)
             {
                 Debug.LogWarning("Interval seconds must be at least 15, using the minimum value instead.");
@@ -135,12 +143,14 @@ namespace Unity.Simulation.Games
             var counter = GetCounter(counterName);
             counter.CaptureStepSeries(intervalSeconds);
             TickManager.Enable();
+#endif
         }
 
         //
         // Non-public
         //
 
+        #if UNITY_GAME_SIMULATION || UNITY_EDITOR
         object _mutex = new object();
 
         Dictionary<string, Counter> _counters = new Dictionary<string, Counter>();
@@ -152,8 +162,6 @@ namespace Unity.Simulation.Games
             Log.I("Initializing the Game Simulation package");
             Manager.Instance.ShutdownNotification += ShutdownHandler;
         }
-
-        static readonly GameSimManager _instance = new GameSimManager();
 
         [Serializable]
         struct CountersData
@@ -281,6 +289,7 @@ namespace Unity.Simulation.Games
                 _countersSequence++;
             }
         }
+#endif
 
         /// <summary>
         /// Fetch the GameSim config for this instance.
@@ -289,7 +298,9 @@ namespace Unity.Simulation.Games
         /// that can be used to get GameSim values for the keys in the simulation.</param>
         public void FetchConfig(Action<GameSimConfigResponse> configFetchCompleted)
         {
+#if UNITY_GAME_SIMULATION || UNITY_EDITOR
             RemoteConfigProvider.Instance.FetchRemoteConfig(configFetchCompleted);
+#endif
         }
 
     }

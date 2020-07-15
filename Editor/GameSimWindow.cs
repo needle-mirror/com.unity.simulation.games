@@ -1,4 +1,3 @@
-﻿using System.Collections;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using UnityEngine;
@@ -48,13 +47,16 @@ namespace Unity.Simulation.Games.Editor
         int selectedTab = 0;
 
         const string kMessageString =
-        "Create and upload a linux build for simulation. Note: we will include the scenes from your most recent build. " +
+        "Create and upload a Linux build for simulation. Note: we will include the scenes from your most recent build. " +
         "If you haven't uploaded a build yet, we will include the open scenes in your project. " +
         "Specify a build name, and select the scenes you want to include from the list.";
         const string kScenesInBuild = "Scenes In Build";
         const string kNoScenesText = "No Scenes Loaded. Either load one or more scenes, or select scenes to include in the Build Settings dialog.";
         const string kLocationText = "Build Location";
         const string kFieldText = "Build Name";
+
+        private BuildReport lastBuildReport = null;
+        private List<BuildStepMessage> lastBuildErrorMessages = new List<BuildStepMessage>();
 
         Rect toolbarRect
         {
@@ -145,7 +147,7 @@ namespace Unity.Simulation.Games.Editor
 
         private void Treeview_OnSettingChanged(JObject arg1, JObject arg2)
         {
-            if(arg1 == null && arg2 != null)
+            if (arg1 == null && arg2 != null)
             {
                 //new setting
                 var newSetting = new JObject()
@@ -177,12 +179,12 @@ namespace Unity.Simulation.Games.Editor
                 UpdateSettingsTreeview(settings);
             }
 
-            else if(arg1 != null && arg2 == null)
+            else if (arg1 != null && arg2 == null)
             {
                 //delete setting
-                for(int i = 0; i < settings.Count; i++)
+                for (int i = 0; i < settings.Count; i++)
                 {
-                    if(settings[i]["metadata"]["entityId"].Value<string>() == arg1["metadata"]["entityId"].Value<string>())
+                    if (settings[i]["metadata"]["entityId"].Value<string>() == arg1["metadata"]["entityId"].Value<string>())
                     {
                         settings.RemoveAt(i);
                         break;
@@ -190,12 +192,12 @@ namespace Unity.Simulation.Games.Editor
                 }
                 UpdateSettingsTreeview(settings);
             }
-            else if(arg1 != null && arg2 != null)
+            else if (arg1 != null)
             {
                 //udpate setting
-                for(int i = 0; i < settings.Count; i++)
+                for (int i = 0; i < settings.Count; i++)
                 {
-                    if(settings[i]["metadata"]["entityId"].Value<string>() == arg2["metadata"]["entityId"].Value<string>())
+                    if (settings[i]["metadata"]["entityId"].Value<string>() == arg2["metadata"]["entityId"].Value<string>())
                     {
                         settings[i] = arg2;
                         break;
@@ -214,17 +216,17 @@ namespace Unity.Simulation.Games.Editor
         private void RemoteConfigWebApiClient_fetchEnvironmentsFinished(JArray environments)
         {
             JObject gsEnv = null;
-            for(int i = 0; i < environments.Count; i++)
-			{
-                if(environments[i]["name"].Value<string>() == "GameSim")
+            foreach (var environment in environments)
+            {
+                if (environment["name"].Value<string>() == "GameSim")
                 {
-                    gsEnv = (JObject)environments[i];
+                    gsEnv = (JObject)environment;
                     environmentId = gsEnv["id"].Value<string>();
                     FetchConfig(environmentId);
                     break;
                 }
-			}
-            if(gsEnv == null)
+            }
+            if (gsEnv == null)
             {
                 RemoteConfigWebApiClient.environmentCreated += RemoteConfigWebApiClient_environmentCreated;
                 RemoteConfigWebApiClient.CreateEnvironment(Application.cloudProjectId, "GameSim");
@@ -258,7 +260,7 @@ namespace Unity.Simulation.Games.Editor
         {
             var returnArr = new JArray();
 
-            for(int i = 0; i < settingsArr.Count; i++)
+            foreach (var t in settingsArr)
             {
                 returnArr.Add(new JObject()
                 {
@@ -271,7 +273,7 @@ namespace Unity.Simulation.Games.Editor
                         }
                     },
                     {
-                        "rs", settingsArr[i]
+                        "rs", t
                     }
                 });
             }
@@ -318,7 +320,7 @@ namespace Unity.Simulation.Games.Editor
 
             if (GUI.Button(new Rect(position.width - 115, toolbarRect.y, 110, k_LineHeight), "Create Simulation"))
             {
-                Help.BrowseURL(string.Format("https://gamesimulation.unity3d.com/simulations/new?projectId={0}", Application.cloudProjectId));
+                Help.BrowseURL($"https://gamesimulation.unity3d.com/simulations/new?projectId={Application.cloudProjectId}");
             }
 
             if (selectedTab == 0)
@@ -360,7 +362,7 @@ namespace Unity.Simulation.Games.Editor
           
                 GUI.Box(scrollRect, "", EditorStyles.helpBox);
                 scrollPosition = GUI.BeginScrollView(scrollRect, scrollPosition, new Rect(0, 0, kScrollViewWidth, k_LineHeight * scenes.Length));
-                if(scenes != null && scenes.Length > 0)
+                if (scenes != null && scenes.Length > 0)
                 {
                     for (int i = 0; i < scenes.Length; i++)
                     {
@@ -370,7 +372,7 @@ namespace Unity.Simulation.Games.Editor
                             selectedScenes.TryGetValue(scenes[i], out selected);
                         }
                         selected = GUI.Toggle(new Rect(0, 0 + (k_LineHeight * i), kScrollViewWidth, k_LineHeight), selected, scenes[i]);
-                        if(scenes[i] != null)
+                        if (scenes[i] != null)
                         {
                             selectedScenes[scenes[i]] = selected;
                         }
@@ -393,37 +395,110 @@ namespace Unity.Simulation.Games.Editor
             DrawButtons(new Rect(buildNameRect.x, buildNameRect.y + buildNameRect.height + k_LineHeight, rect.width, k_LineHeight));
         }
 
+            
+        private readonly Regex buildPatternRegex = new Regex(@"^[a-zA-Z0-9]{2,63}$");
         void DrawButtons(Rect rect)
         {
-            string buildNamePattern = @"^[a-zA-Z0-9]{2,63}$";
-            Regex rgx = new Regex(buildNamePattern);
+            int numberHelpBoxes = 0;
 
-            EditorGUI.BeginDisabledGroup(string.IsNullOrEmpty(buildName) || !rgx.IsMatch(buildName) || selectedScenesCount == 0);
+            EditorGUI.BeginDisabledGroup(string.IsNullOrEmpty(buildName) || !buildPatternRegex.IsMatch(buildName) || selectedScenesCount == 0);
 
-            if (string.IsNullOrEmpty(buildName) || !rgx.IsMatch(buildName))
+            if (string.IsNullOrEmpty(buildName) || !buildPatternRegex.IsMatch(buildName))
             {
-                EditorGUI.HelpBox(new Rect(rect.x + 50, rect.y + k_LineHeight + 5, rect.width - 100, k_LineHeight), "Names must be between 2 and 63 characters long and can only contain alpha numeric characters.", MessageType.Error);
+                ++numberHelpBoxes;
+                EditorGUI.HelpBox(new Rect(rect.x + 50, rect.y + numberHelpBoxes * (k_LineHeight + 5), rect.width - 100, k_LineHeight),
+                    "Names must be between 2 and 63 characters long and can only contain alpha numeric characters.",
+                    MessageType.Error);
             }
 
-            if(GUI.Button(new Rect((rect.width - 150)/2, rect.y, 150, k_LineHeight), "Build and Upload"))
+            if (GUI.Button(new Rect((rect.width - 150) / 2, rect.y, 150, k_LineHeight), "Build and Upload"))
             {
                 var includedScenes = new List<string>(selectedScenesCount);
                 foreach (var kv in selectedScenes)
-                    if (kv.Value == true)
+                {
+                    if (kv.Value)
+                    {
                         includedScenes.Add(kv.Key);
+                    }
+                }
 
                 var buildLocation = Path.Combine(Application.dataPath, "..", "Build", buildName);
                 Directory.CreateDirectory(buildLocation);
-                BuildProject(buildLocation, buildName, includedScenes.ToArray(), BuildTarget.StandaloneLinux64, compress: true, launch: false);
-                var id = GameSimApiClient.UploadBuild(buildName, $"{buildLocation}.zip");
-                Debug.Log($"Build {buildName} uploaded with build id {id}");
+                lastBuildReport = BuildProject(buildLocation, buildName, includedScenes.ToArray(), BuildTarget.StandaloneLinux64, compress: true, launch: false);
+
+                if (lastBuildReport.summary.result == BuildResult.Succeeded)
+                {
+                    var id = GameSimApiClient.UploadBuild(buildName, $"{buildLocation}.zip");
+                    Debug.Log($"Build {buildName} uploaded with build id {id}");
+                }
+                else
+                {
+                    lastBuildErrorMessages.Clear();
+                    foreach (var step in lastBuildReport.steps)
+                    {
+                        foreach (var message in step.messages)
+                        {
+                            if (message.type == LogType.Error)
+                            {
+                                lastBuildErrorMessages.Add(message);
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (lastBuildReport != null && lastBuildReport.summary.result != BuildResult.Succeeded)
+            {
+                DisplayBuildErrors(rect, ref numberHelpBoxes);
             }
 
             EditorGUI.EndDisabledGroup();
         }
 
-        public static void BuildProject(string savePath, string name, string[] scenes = null, BuildTarget target = BuildTarget.StandaloneLinux64, bool compress = true, bool launch = false)
+        private void DisplayBuildErrors(Rect rect, ref int numberHelpBoxes)
         {
+            if (lastBuildErrorMessages.Count > 0)
+            {
+                foreach (var message in lastBuildErrorMessages)
+                {
+                    ++numberHelpBoxes;
+                    EditorGUI.HelpBox(
+                        new Rect(rect.x + 50, rect.y + numberHelpBoxes * (k_LineHeight + 5), rect.width - 100,
+                            k_LineHeight),
+                        message.content,
+                        MessageType.Error);
+                }
+            }
+            else
+            {
+                ++numberHelpBoxes;
+                EditorGUI.HelpBox(
+                    new Rect(rect.x + 50, rect.y + numberHelpBoxes * (k_LineHeight + 5), rect.width - 100,
+                        k_LineHeight),
+                    "Unknown Error",
+                    MessageType.Error);
+            }
+        }
+
+        public static BuildReport BuildProject(string savePath, string name, string[] scenes = null, BuildTarget target = BuildTarget.StandaloneLinux64, bool compress = true, bool launch = false)
+        {
+            var currentScriptingDefines = PlayerSettings.GetScriptingDefineSymbolsForGroup(BuildTargetGroup.Standalone);
+            bool alreadyContains = currentScriptingDefines.EndsWith(";UNITY_GAME_SIMULATION") ||
+                                   currentScriptingDefines.Contains("UNITY_GAME_SIMULATION;") ||
+                                   currentScriptingDefines.Equals("UNITY_GAME_SIMULATION");
+
+            if (!alreadyContains)
+            {
+                if (currentScriptingDefines.Length == 0)
+                {
+                    PlayerSettings.SetScriptingDefineSymbolsForGroup(BuildTargetGroup.Standalone, "UNITY_GAME_SIMULATION");
+                }
+                else
+                {
+                    PlayerSettings.SetScriptingDefineSymbolsForGroup(BuildTargetGroup.Standalone, "UNITY_GAME_SIMULATION;" + currentScriptingDefines);
+                }
+            }
+            
             Directory.CreateDirectory(savePath);
 
 #if !UNITY_2019_1_OR_NEWER
@@ -442,6 +517,11 @@ namespace Unity.Simulation.Games.Editor
             BuildReport report = BuildPipeline.BuildPlayer(buildPlayerOptions);
             BuildSummary summary = report.summary;
 
+            if (!alreadyContains)
+            {
+                PlayerSettings.SetScriptingDefineSymbolsForGroup(BuildTargetGroup.Standalone, currentScriptingDefines);
+            }
+
 #if !UNITY_2019_1_OR_NEWER
             PlayerSettings.displayResolutionDialog = displayResolutionDialog;
 #endif
@@ -449,13 +529,13 @@ namespace Unity.Simulation.Games.Editor
 
             if (summary.result == BuildResult.Succeeded)
             {
-                Debug.Log("Build succeeded: " + summary.totalSize + " bytes");
+                Debug.Log($"Build succeeded: {summary.totalSize} bytes");
             }
 
             if (summary.result == BuildResult.Failed)
             {
                 Debug.Log("Build failed");
-                return;
+                return report;
             }
 
             if (launch)
@@ -466,7 +546,11 @@ namespace Unity.Simulation.Games.Editor
             }
 
             if (compress)
+            {
                 Zip.DirectoryContents(savePath, name);
+            }
+
+            return report;
         }
 
         public static string[] GetOpenScenes()
@@ -505,9 +589,9 @@ namespace Unity.Simulation.Games.Editor
             isMakingHttpCall = true;
             var newSettings = new JArray();
 
-            for(int i = 0; i < settingsArr.Count; i++)
+            foreach (var t in settingsArr)
             {
-                newSettings.Add(settingsArr[i]["rs"].DeepClone());
+                newSettings.Add(t["rs"].DeepClone());
             }
 
             RemoteConfigWebApiClient.settingsRequestFinished += RemoteConfigWebApiClient_settingsRequestFinished;
@@ -534,14 +618,7 @@ namespace Unity.Simulation.Games.Editor
 
         public void OnAfterDeserialize()
         {
-            if(_settings != null)
-            {
-                settings = JArray.Parse(_settings);
-            }
-            else
-            {
-                settings = new JArray();
-            }
+            settings = _settings != null ? JArray.Parse(_settings) : new JArray();
 
             selectedScenes = new Dictionary<string, bool>();
 
@@ -550,4 +627,3 @@ namespace Unity.Simulation.Games.Editor
         }
     }
 }
-

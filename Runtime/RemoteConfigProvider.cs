@@ -7,7 +7,13 @@ namespace Unity.Simulation.Games
 {
     internal class RemoteConfigProvider
     {
-        private RemoteConfigProvider() { }
+#if UNITY_GAME_SIMULATION || UNITY_EDITOR
+        internal ConfigManagerImpl configManager;
+        
+        private RemoteConfigProvider()
+        {
+            configManager = new ConfigManagerImpl("RemoteConfigGS.json", "RemoteConfigHeadersGS.json");
+        }
 
         public static RemoteConfigProvider Instance { get; } = new RemoteConfigProvider();
 
@@ -33,7 +39,8 @@ namespace Unity.Simulation.Games
         public void FetchRemoteConfig(Action<GameSimConfigResponse> remoteConfigFetchComplete = null)
         {
             Log.I("Fetching App Config from Remote Config");
-            ConfigManager.FetchCompleted += Instance.ApplyRemoteConfigChanges;
+            configManager.FetchCompleted -= Instance.ApplyRemoteConfigChanges;
+            configManager.FetchCompleted += Instance.ApplyRemoteConfigChanges;
             long num = 0;
 
             UserAttributes _userAtt = default(UserAttributes);
@@ -57,11 +64,11 @@ namespace Unity.Simulation.Games
                         gameSimDecisionEngineType = appParams.gameSimDecisionEngineType
                     };
                 }
-                ConfigManager.SetEnvironmentID(appParams.environmentId);
+                configManager.SetEnvironmentID(appParams.environmentId);
             }
 
             ConfigHandler = remoteConfigFetchComplete;
-            ConfigManager.FetchConfigs(_userAtt, new UserAttributes());
+            configManager.FetchConfigs(_userAtt, new UserAttributes());
         }
 
         void ApplyRemoteConfigChanges(ConfigResponse response)
@@ -77,12 +84,13 @@ namespace Unity.Simulation.Games
                     break;
                 case ConfigOrigin.Remote:
                     Log.I("Remote Config fetch was completed successfully with the server");
-                    Log.I("Config fetched: " + ConfigManager.appConfig.config.ToString(Newtonsoft.Json.Formatting.None));
-                    GameSimManager.Instance.AddMetaData = () => ConfigManager.appConfig.config.ToString(Newtonsoft.Json.Formatting.None);
+                    Log.I("Config fetched: " + configManager.appConfig.config.ToString(Newtonsoft.Json.Formatting.None));
+                    GameSimManager.Instance.AddMetaData = () => configManager.appConfig.config.ToString(Newtonsoft.Json.Formatting.None);
                     ConfigHandler?.Invoke(new GameSimConfigResponse());
                     break;
             }
         }
+#endif
     }
 
 }

@@ -1,2 +1,3 @@
 * [About Unity Game Simulation](index)
-* [Implementation](ImplementationGuide)
+* [Implementing Game Simulation](ImplementationGuide)
+* [Using the Game Simulation window](GameSimulationWindow)
