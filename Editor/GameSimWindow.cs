@@ -316,6 +316,11 @@ namespace Unity.Simulation.Games.Editor
             InitIfNeeded();
             EditorGUI.BeginDisabledGroup(isMakingHttpCall);
 
+            if (!GameSimApiClient.instance.gamesimUrl.Equals("https://api.prd.gamesimulation.unity3d.com"))
+            {
+                GUI.Label(new Rect(0, toolbarRect.y, toolbarRect.width, k_LineHeight), GameSimApiClient.instance.gamesimUrl);
+            }
+
             selectedTab = GUI.Toolbar(new Rect((position.width - toolbarRect.width)/2 , toolbarRect.y, toolbarRect.width, k_LineHeight), selectedTab, new GUIContent[] { new GUIContent("Parameter Set Up"), new GUIContent("Build Upload") });
 
             if (GUI.Button(new Rect(position.width - 115, toolbarRect.y, 110, k_LineHeight), "Create Simulation"))
@@ -428,7 +433,7 @@ namespace Unity.Simulation.Games.Editor
 
                 if (lastBuildReport.summary.result == BuildResult.Succeeded)
                 {
-                    var id = GameSimApiClient.UploadBuild(buildName, $"{buildLocation}.zip");
+                    var id = GameSimApiClient.instance.UploadBuild(buildName, $"{buildLocation}.zip");
                     Debug.Log($"Build {buildName} uploaded with build id {id}");
                 }
                 else

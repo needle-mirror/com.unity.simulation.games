@@ -8,11 +8,78 @@ using UnityEngine.Networking;
 
 namespace Unity.Simulation.Games.Editor
 {
-    internal static class GameSimApiClient
+#if UNITY_2020_1_OR_NEWER
+    [FilePath("GameSimApi", FilePathAttribute.Location.PreferencesFolder)]
+#endif
+    public class GameSimApiClient : ScriptableSingleton<GameSimApiClient>
     {
-        public static string UploadBuild(string name, string location)
+        [SerializeField]
+        internal string gamesimUrl = "https://api.prd.gamesimulation.unity3d.com";
+        
+        /// <summary>
+        /// Requests a build URL and uploads a zipped build. Only supports linux x86_64 target
+        /// </summary>
+        /// <param name="name">build name for display in Unity Game Simulation's web ui</param>
+        /// <param name="location">zip file containing the build</param>
+        /// <returns>build id from Unity Game Simulation platform services</returns>
+        public string UploadBuild(string name, string location)
         {
-            return Transaction.Upload($"https://api.prd.gamesimulation.unity3d.com/v1/builds?projectId={Application.cloudProjectId}", name, location);
+            Save(true);
+            return Transaction.Upload($"{gamesimUrl}/v1/builds?projectId={Application.cloudProjectId}", name, location);
+        }
+
+        /// <summary>
+        /// Lists all jobs under the current organization
+        /// </summary>
+        /// <returns>Web response to /v1/jobs/list api endpoint</returns>
+        public UnityWebRequestAsyncOperation ListJobs()
+        {
+            var request = UnityWebRequest.Get($"{gamesimUrl}/v1/jobs/list?projectId={Application.cloudProjectId}");
+            var headers = Utils.GetAuthHeader(CloudProjectSettings.accessToken);
+            foreach (var kvp in headers)
+            {
+                request.SetRequestHeader(kvp.Key, kvp.Value);
+            }
+
+            return request.SendWebRequest();
+        }
+        
+        /// <summary>
+        /// Describes a job
+        /// </summary>
+        /// <param name="jobId">ID of the job to query</param>
+        /// <returns>Web response for v1/jobs/{jobId}/describe api endpoint</returns>
+        public UnityWebRequestAsyncOperation DescribeJob(string jobId)
+        {
+            var request = UnityWebRequest.Get($"{gamesimUrl}/v1/jobs/{jobId}/describe?projectId={Application.cloudProjectId}");
+            var headers = Utils.GetAuthHeader(CloudProjectSettings.accessToken);
+            foreach (var kvp in headers)
+            {
+                request.SetRequestHeader(kvp.Key, kvp.Value);
+            }
+
+            return request.SendWebRequest();
+        }
+
+        [Serializable]
+        public class JobsList
+        {
+            public string projectId;
+            public List<Job> jobs;
+        }
+
+        [Serializable]
+        public class Job
+        {
+            public string id;
+            public string name;
+            public string buildId;
+            public string stage;
+            public string status;
+            public long executionTimeSeconds;
+            public bool hasStepData;
+            public DateTime createdAt;
+            public DateTime updatedAt;
         }
     }
 
@@ -36,7 +103,8 @@ namespace Unity.Simulation.Games.Editor
                 webrx.uploadHandler = new UploadHandlerRaw(data);
                 webrx.SendWebRequest();
                 while (!webrx.isDone)
-                    ;
+                {
+                }
 
                 if (webrx.isNetworkError || webrx.isHttpError)
                 {
@@ -88,7 +156,8 @@ namespace Unity.Simulation.Games.Editor
                 webrx.timeout = 30;
                 webrx.SendWebRequest();
                 while (!webrx.isDone)
-                    ;
+                {
+                }
 
                 if (webrx.isNetworkError || webrx.isHttpError)
                 {
@@ -112,6 +181,7 @@ namespace Unity.Simulation.Games.Editor
             this.description = description;
         }
     }
+    
 #pragma warning disable CS0649
     [Serializable]
     internal struct UploadUrlData
@@ -120,9 +190,10 @@ namespace Unity.Simulation.Games.Editor
         public string upload_uri;
     }
 #pragma warning restore CS0649
+    
     internal static class Utils
     {
-        internal const string pacakgeVersion = "0.4.3-preview.1";
+        internal const string pacakgeVersion = "0.4.3-preview.3";
 
         internal static Dictionary<string, string> GetAuthHeader(string tokenString)
         {

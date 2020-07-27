@@ -11,9 +11,8 @@ namespace Unity.Simulation.Games
     {
         private static GameSimManager _instance;
         public static GameSimManager Instance => _instance ?? (_instance = new GameSimManager());
-        
-#if UNITY_GAME_SIMULATION || UNITY_EDITOR
 
+#if UNITY_GAME_SIMULATION || UNITY_EDITOR
         internal string RunId { get; }
 
         internal int InstanceId { get; }
@@ -150,21 +149,21 @@ namespace Unity.Simulation.Games
         // Non-public
         //
 
-        #if UNITY_GAME_SIMULATION || UNITY_EDITOR
+#if UNITY_GAME_SIMULATION || UNITY_EDITOR
         object _mutex = new object();
 
         Dictionary<string, Counter> _counters = new Dictionary<string, Counter>();
-        
+
         HashSet<string> _snapshotLabels = new HashSet<string>();
-        
-        GameSimManager()
+
+        private GameSimManager()
         {
-            Log.I("Initializing the Game Simulation package");
+            Log.I($"Initializing the Game Simulation package");
             Manager.Instance.ShutdownNotification += ShutdownHandler;
         }
 
         [Serializable]
-        struct CountersData
+        private struct CountersData
         {
             public Metadata metadata;
             public Counter[] items;
@@ -180,7 +179,7 @@ namespace Unity.Simulation.Games
         }
 
         [Serializable]
-        struct Metadata
+        private struct Metadata
         {
             public string instanceId;
             public string attemptId;
@@ -200,6 +199,7 @@ namespace Unity.Simulation.Games
         /// <param name="counter">Name of the counter. It is also the name of the file.</param>
         /// <param name="consumer">If you want to perform any operations on the file once it is generated. Write to the FS happens on a background thread.</param>
         /// <param name="resetCounter">Resets the counter. Set to true by default.</param>
+        [Obsolete("This method is not currently used and may be removed in a future version.")]
         internal void ResetAndFlushCounterToDisk(string counter, Action<string> consumer = null, bool resetCounter = true)
         {
             var asyncWriteRequest = Manager.Instance.CreateRequest<AsyncRequest<String>>();
@@ -235,6 +235,7 @@ namespace Unity.Simulation.Games
         /// This can be called at any time you want to capture the state of the counters.
         /// </summary>
         /// <param name="resetCounters">This tells if the counters needs to be reset. By default it's set to true.</param>
+        [Obsolete("This method is not currently used and may be removed in a future version.")]
         internal void FlushAllCountersToDiskAndReset(bool resetCounters = true)
         {
             FlushCountersToDisk();
@@ -245,7 +246,7 @@ namespace Unity.Simulation.Games
             }
         }
 
-        void ResetCounters()
+        private void ResetCounters()
         {
             foreach (var kvp in _counters)
             {
@@ -254,32 +255,35 @@ namespace Unity.Simulation.Games
             }
         }
 
-        void ShutdownHandler()
+        private void ShutdownHandler()
         {
             _isShuttingDown = true;
 
             FlushCountersToDisk();
         }
 
-        void FlushCountersToDisk()
+        private void FlushCountersToDisk()
         {
             Log.I("Flushing counters to disk");
             string json = null;
 
+            Metadata metadata;
+            CountersData counters;
             lock (_mutex)
             {
-                Metadata metadata = new Metadata(
+                metadata = new Metadata(
                     Configuration.Instance.GetInstanceId(),
                     Configuration.Instance.GetAttemptId(),
                     AddMetaData?.Invoke()
                 );
-                
-                CountersData counters = new CountersData(_counters, metadata);
-                json = JsonConvert.SerializeObject(counters, new JsonSerializerSettings
-                {
-                    NullValueHandling = NullValueHandling.Ignore
-                });
+
+                counters = new CountersData(_counters, metadata);
             }
+
+            json = JsonConvert.SerializeObject(counters, new JsonSerializerSettings
+            {
+                NullValueHandling = NullValueHandling.Ignore
+            });
 
             Log.I("Writing the GameSim Counters files..");
             if (json != null)

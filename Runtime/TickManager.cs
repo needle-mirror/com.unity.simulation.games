@@ -13,6 +13,7 @@ namespace Unity.Simulation.Games
                 if (_instance != null)
                     return _instance;
             
+                // TODO: remove this allocation
                 var obj = new GameObject("GameSimTickManager");
                 _instance = obj.AddComponent<TickManager>();
                 DontDestroyOnLoad(obj);
