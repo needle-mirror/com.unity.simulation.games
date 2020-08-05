@@ -5,6 +5,14 @@ All notable changes to this package will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.4.3-preview.5] - 2020-08-05
+## This is the v0.4.3-preview.5 release of *Unity Game Simulation*
+- Address an issue which could result in parameters not correctly forwarding to the simulation.
+
+## [0.4.3-preview.4] - 2020-07-30
+## This is the v0.4.3-preview.4 release of *Unity Game Simulation*
+- Update documentation
+
 ## [0.4.3-preview.3] - 2020-07-27
 ## This is the v0.4.3-preview.3 release of *Unity Game Simulation*
 - Uses a separate remote config environment, allowing users to use remote config without polluting their game environment from their game sim environment

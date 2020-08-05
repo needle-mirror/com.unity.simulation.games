@@ -36,4 +36,4 @@ Additionally, make sure you have the following design and experimentation questi
 
 ## Additional documentation
 * [FAQ](https://unity-technologies.github.io/gamesimulation/Docs/FAQ.html)
-* [Dashboard Documentation](https://unity-technologies.github.io/gamesimulation/Docs/dashboard.html)
+* [Dashboard Documentation](https://unity-technologies.github.io/gamesimulation/Docs/Dashboard.html)
