@@ -4,6 +4,7 @@ using System.Text;
 using System.Collections.Generic;
 using Newtonsoft.Json;
 using UnityEngine;
+using Newtonsoft.Json.Linq;
 
 namespace Unity.Simulation.Games
 {
@@ -307,5 +308,36 @@ namespace Unity.Simulation.Games
 #endif
         }
 
+        /// <summary>
+        /// Returns the value associated with the given key.
+        /// </summary>
+        /// <param name="key">Name of the parameter to fetch</param>
+        /// <param name="defaultValue">If not found, the value returned by this function. Defaults to the default value for the given type.</param>
+        /// <typeparam name="T">Type of the parameter. At edit time you can infer this with GameSimEditorUtilities.TypeFor(string key).</typeparam>
+        /// <returns>Value associated with the key</returns>
+        public T Get<T>(string key, T defaultValue = default)
+        {
+            var config = RemoteConfigProvider.Instance.configManager.appConfig.config[key];
+            return config != null ? config.Value<T>() : defaultValue;
+        }
+
+        /// <summary>
+        /// Returns whether or not the given key exists in the parameter configuration
+        /// </summary>
+        /// <param name="key"></param>
+        /// <returns></returns>
+        public bool HasKey(string key)
+        {
+            return RemoteConfigProvider.Instance.configManager.appConfig.HasKey(key);
+        }
+        
+        /// <summary>
+        /// Returns a list of all keys for parameters in the game simulation environment
+        /// </summary>
+        /// <returns></returns>
+        public string[] GetKeys()
+        {
+            return RemoteConfigProvider.Instance.configManager.appConfig.GetKeys();
+        }
     }
 }

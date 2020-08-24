@@ -193,7 +193,7 @@ namespace Unity.Simulation.Games.Editor
     
     internal static class Utils
     {
-        internal const string pacakgeVersion = "0.4.3-preview.5";
+        internal const string pacakgeVersion = "0.4.3-preview.7";
 
         internal static Dictionary<string, string> GetAuthHeader(string tokenString)
         {
