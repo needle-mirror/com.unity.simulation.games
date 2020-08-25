@@ -5,9 +5,9 @@ All notable changes to this package will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-## [0.4.3-preview.7] - 2020-08-24
-## This is the v0.4.3-preview.7 release of *Unity Game Simulation*
-- Provide some additional convenience methods
+## [0.4.4-preview.1] - 2020-08-25
+## This is the v0.4.4-preview.1 release of *Unity Game Simulation*
+- Updated dependencies
 
 ## [0.4.3-preview.5] - 2020-08-05
 ## This is the v0.4.3-preview.5 release of *Unity Game Simulation*
