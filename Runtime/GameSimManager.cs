@@ -317,8 +317,17 @@ namespace Unity.Simulation.Games
         /// <returns>Value associated with the key</returns>
         public T Get<T>(string key, T defaultValue = default)
         {
+#if UNITY_GAME_SIMULATION || UNITY_EDITOR
             var config = RemoteConfigProvider.Instance.configManager.appConfig.config[key];
-            return config != null ? config.Value<T>() : defaultValue;
+            if (config == null)
+            {
+                Debug.LogWarning("failed to fetch configuration");
+                return defaultValue;
+            }
+            return config.Value<T>();
+#else
+            return default;
+#endif
         }
 
         /// <summary>
@@ -328,7 +337,11 @@ namespace Unity.Simulation.Games
         /// <returns></returns>
         public bool HasKey(string key)
         {
+#if UNITY_GAME_SIMULATION || UNITY_EDITOR
             return RemoteConfigProvider.Instance.configManager.appConfig.HasKey(key);
+#else
+            return false;
+#endif
         }
         
         /// <summary>
@@ -337,7 +350,11 @@ namespace Unity.Simulation.Games
         /// <returns></returns>
         public string[] GetKeys()
         {
+#if UNITY_GAME_SIMULATION || UNITY_EDITOR
             return RemoteConfigProvider.Instance.configManager.appConfig.GetKeys();
+#else
+            return null;
+#endif
         }
     }
 }
