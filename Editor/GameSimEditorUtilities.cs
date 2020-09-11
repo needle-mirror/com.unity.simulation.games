@@ -2,10 +2,12 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 using Unity.RemoteConfig.Editor;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace Unity.Simulation.Games.Editor
 {
@@ -40,6 +42,22 @@ namespace Unity.Simulation.Games.Editor
         private static BlockingCollection<Tuple<string, TaskCompletionSource<Type>>> _taskCompletionSources = new BlockingCollection<Tuple<string, TaskCompletionSource<Type>>>();
         private static bool _running = false;
 
+        private static TaskScheduler unityTaskScheduler;
+
+        /// <summary>
+        /// Initializes the editor utilities; must be called on the main thread. Captures the UnitySynchronizationContext
+        /// </summary>
+        /// <exception cref="Exception">Called from outside the main thread</exception>
+        public static void Init()
+        {
+            if (Thread.CurrentThread.ManagedThreadId != 1)
+            {
+                throw new Exception("Init must be called from the main thread");
+            }
+
+            unityTaskScheduler = TaskScheduler.FromCurrentSynchronizationContext();
+        }
+
         /// <summary>
         /// Returns the type for a given parameter based on the key.
         /// </summary>
@@ -48,10 +66,18 @@ namespace Unity.Simulation.Games.Editor
         /// <exception cref="Exception"></exception>
         public static Task<Type> TypeFor(string key)
         {
+            if (unityTaskScheduler == null)
+            {
+                throw new Exception("Init must be called from the main thread prior to calling TypeFor");
+            }
+
             var next = new Tuple<string, TaskCompletionSource<Type>>(key, new TaskCompletionSource<Type>());
             _taskCompletionSources.TryAdd(next);
 
-            var cloudProjectId = Application.cloudProjectId;
+            var cloudProjectId = Task.Factory.StartNew(() =>
+            {
+                return Application.cloudProjectId;
+            }, CancellationToken.None, TaskCreationOptions.None, unityTaskScheduler).Result;
 
             lock (typeForTaskMut)
             {

@@ -5,8 +5,20 @@ All notable changes to this package will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+
+## [0.4.4-preview.4] - 2020-09-11
+## This is the v0.4.4-preview.4 release of *Unity Game Simulation*
+- update package dependencies
+  - com.unity.remote-config: 1.4.0-preview.1
+  - com.unity.simulation.core: 0.0.10-perview.18
+- added button to upload zipped builds to editor window
+
+## [0.4.4-preview.3] - 2020-09-09
+## This is the v0.4.4-preview.3 release of *Unity Game Simulation*
+- Fix threading issue in editor utility methods
+
 ## [0.4.4-preview.2] - 2020-08-27
-## This is the v0.4.4-preview.1 release of *Unity Game Simulation*
+## This is the v0.4.4-preview.2 release of *Unity Game Simulation*
 - Fix issue for builds where UNITY_GAME_SIMULATION is not defined
 
 ## [0.4.4-preview.1] - 2020-08-25

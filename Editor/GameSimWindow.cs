@@ -17,6 +17,12 @@ namespace Unity.Simulation.Games.Editor
 {
     internal class GameSimWindow : EditorWindow, ISerializationCallbackReceiver
     {
+        private enum GameSimTabs : int
+        {
+            parameterSetUp,
+            buildUpload,
+        };
+
         SettingsTreeview treeview;
 
         string environmentId;
@@ -25,6 +31,7 @@ namespace Unity.Simulation.Games.Editor
         JArray settings = new JArray();
         string _settings;
         const float k_LineHeight = 22f;
+        const int buttonWidth = 110;
 
         GUIContent servicesNotEnabledContent = new GUIContent("To get started with Unity Game Simulation, you must first link your project to a Unity Cloud Project ID. A Unity Cloud Project ID is an online identifier which is used across all Unity Services. These can be created within the Services window itself, or online on the Unity Services website. The simplest way is to use the Services window within Unity, as follows: \nTo open the Services Window, go to Window > General > Services.\nNote: using Unity Game Simulation does not require that you turn on any additional, individual cloud services like Analytics, Ads, Cloud Build, etc.");
 
@@ -38,18 +45,15 @@ namespace Unity.Simulation.Games.Editor
         Dictionary<string, bool> selectedScenes = new Dictionary<string, bool>();
         List<string> _selectedScenesKeys = new List<string>();
         List<bool> _selectedScenesValues = new List<bool>();
-        const int kWindowWidth = 500;
-        const int kWindowHeight = 245;
         const int kScrollViewWidth = 490;
-        const int kScrollViewHeight = 60;
-        const int kFieldTextWidth = 90;
 
-        int selectedTab = 0;
+        GameSimTabs selectedTab = 0;
 
         const string kMessageString =
         "Create and upload a Linux build for simulation. Note: we will include the scenes from your most recent build. " +
         "If you haven't uploaded a build yet, we will include the open scenes in your project. " +
         "Specify a build name, and select the scenes you want to include from the list.";
+
         const string kScenesInBuild = "Scenes In Build";
         const string kNoScenesText = "No Scenes Loaded. Either load one or more scenes, or select scenes to include in the Build Settings dialog.";
         const string kLocationText = "Build Location";
@@ -87,14 +91,6 @@ namespace Unity.Simulation.Games.Editor
             get
             {
                 return new Rect(toolbarRect.x, toolbarRect.y + toolbarRect.height, position.width, 2 * k_LineHeight);
-            }
-        }
-
-        Rect scenesGUIRect
-        {
-            get
-            {
-                return new Rect(buildUploadHelpTextRect.x, buildUploadHelpTextRect.y + buildUploadHelpTextRect.height, position.width, position.height - buildUploadHelpTextRect.height - toolbarRect.height);
             }
         }
 
@@ -194,7 +190,7 @@ namespace Unity.Simulation.Games.Editor
             }
             else if (arg1 != null)
             {
-                //udpate setting
+                // update setting
                 for (int i = 0; i < settings.Count; i++)
                 {
                     if (settings[i]["metadata"]["entityId"].Value<string>() == arg2["metadata"]["entityId"].Value<string>())
@@ -321,21 +317,21 @@ namespace Unity.Simulation.Games.Editor
                 GUI.Label(new Rect(0, toolbarRect.y, toolbarRect.width, k_LineHeight), GameSimApiClient.instance.gamesimUrl);
             }
 
-            selectedTab = GUI.Toolbar(new Rect((position.width - toolbarRect.width)/2 , toolbarRect.y, toolbarRect.width, k_LineHeight), selectedTab, new GUIContent[] { new GUIContent("Parameter Set Up"), new GUIContent("Build Upload") });
+            {
+                EditorGUILayout.BeginVertical();
+                selectedTab = (GameSimTabs)GUILayout.Toolbar((int)selectedTab, new[] {"Parameter Set Up", "Build Upload"});
 
-            if (GUI.Button(new Rect(position.width - 115, toolbarRect.y, 110, k_LineHeight), "Create Simulation"))
-            {
-                Help.BrowseURL($"https://gamesimulation.unity3d.com/simulations/new?projectId={Application.cloudProjectId}");
-            }
+                switch (selectedTab)
+                {
+                    case GameSimTabs.buildUpload:
+                        DrawBuildUpload();
+                        break;
+                    case GameSimTabs.parameterSetUp:
+                        DrawParameterSetup();
+                        break;
+                }
 
-            if (selectedTab == 0)
-            {
-                DrawToolbar(treeviewToolbarRect);
-                treeview.OnGUI(treeviewRect);
-            }
-            else
-            {
-                DrawBuildUpload();
+                EditorGUILayout.EndVertical();
             }
 
             EditorGUI.EndDisabledGroup();
@@ -343,30 +339,50 @@ namespace Unity.Simulation.Games.Editor
 
         void DrawBuildUpload()
         {
+            {
+                GUILayout.BeginHorizontal();
+                GUILayout.FlexibleSpace();
+                if (GUILayout.Button("Create Simulation", new[] {GUILayout.Width(buttonWidth)}))
+                {
+                    Help.BrowseURL($"https://gamesimulation.unity3d.com/simulations/new?projectId={Application.cloudProjectId}");
+                }
+
+                GUILayout.EndHorizontal();
+            }
+
             buildSettingsScenes = GetBuildSettingScenes();
             openScenes = GetOpenScenes();
 
-            DrawHelpText(buildUploadHelpTextRect);
-            DrawScenes(scenesGUIRect);
+            EditorGUILayout.LabelField(kMessageString, EditorStyles.wordWrappedLabel);
+
+            DrawScenes();
         }
 
-        void DrawHelpText(Rect rect)
+        void DrawParameterSetup()
         {
-            EditorGUI.LabelField(rect, kMessageString, EditorStyles.wordWrappedLabel);
+            DrawToolbar(treeviewToolbarRect);
+            treeview.OnGUI(treeviewRect);
         }
 
-        void DrawScenes(Rect rect)
+        void DrawScenes()
         {
             selectedScenesCount = 0;
+                var rect = new Rect(0, (float)(1.5 * k_LineHeight), position.width, position.height - (float)(3.5 * k_LineHeight));
             var labelRect = new Rect(rect.x, rect.y, rect.width, k_LineHeight);
             var scrollRect = new Rect(labelRect.x, labelRect.y + labelRect.height, rect.width, k_LineHeight * 6);
 
-            var scenes = (buildSettingsScenes == null || buildSettingsScenes.Length == 0) ? openScenes : buildSettingsScenes;
+            var scenes = buildSettingsScenes == null || buildSettingsScenes.Length == 0 ? openScenes : buildSettingsScenes;
+
+            EditorGUILayout.LabelField(kScenesInBuild, EditorStyles.boldLabel);
             {
-                EditorGUI.LabelField(labelRect, kScenesInBuild, EditorStyles.boldLabel);
-          
-                GUI.Box(scrollRect, "", EditorStyles.helpBox);
-                scrollPosition = GUI.BeginScrollView(scrollRect, scrollPosition, new Rect(0, 0, kScrollViewWidth, k_LineHeight * scenes.Length));
+                float minHeight = k_LineHeight;
+                var boxRect = GUILayoutUtility.GetRect(0, kScrollViewWidth, k_LineHeight, k_LineHeight * 10);
+
+                var displayBoxRect = new Rect(boxRect.x + k_LineHeight / 2, boxRect.y, boxRect.width - k_LineHeight, boxRect.height);
+                GUI.Box(displayBoxRect, "", EditorStyles.helpBox);
+
+                var scenesListRect = new Rect(displayBoxRect.x + 5, displayBoxRect.y, displayBoxRect.width - 10, displayBoxRect.height);
+                scrollPosition = GUI.BeginScrollView(scenesListRect, scrollPosition, new Rect(0, 0, kScrollViewWidth, k_LineHeight * scenes.Length));
                 if (scenes != null && scenes.Length > 0)
                 {
                     for (int i = 0; i < scenes.Length; i++)
@@ -394,13 +410,13 @@ namespace Unity.Simulation.Games.Editor
 
             var location = Path.Combine("Assets", "..", "Build", string.IsNullOrEmpty(buildName) ? "BuildName" : buildName);
             var locationRect = new Rect(scrollRect.x, scrollRect.y + scrollRect.height + k_LineHeight, scrollRect.width, k_LineHeight);
-            EditorGUI.LabelField(locationRect, kLocationText, location);
+            EditorGUILayout.LabelField(kLocationText, location);
             var buildNameRect = new Rect(locationRect.x, locationRect.y + locationRect.height, locationRect.width, 20);
-            buildName = EditorGUI.TextField(buildNameRect, kFieldText, buildName);
+            buildName = EditorGUILayout.TextField(kFieldText, buildName);
             DrawButtons(new Rect(buildNameRect.x, buildNameRect.y + buildNameRect.height + k_LineHeight, rect.width, k_LineHeight));
         }
 
-            
+
         private readonly Regex buildPatternRegex = new Regex(@"^[a-zA-Z0-9]{2,63}$");
         void DrawButtons(Rect rect)
         {
@@ -408,15 +424,27 @@ namespace Unity.Simulation.Games.Editor
 
             EditorGUI.BeginDisabledGroup(string.IsNullOrEmpty(buildName) || !buildPatternRegex.IsMatch(buildName) || selectedScenesCount == 0);
 
+            bool doBuildUpload = false;
+            bool doUpload = false;
+            {
+                GUILayout.BeginHorizontal();
+                GUILayout.FlexibleSpace();
+                doBuildUpload = GUILayout.Button("Build and Upload", new[] {GUILayout.Width(buttonWidth)});
+                doUpload = GUILayout.Button("Upload Build", new[] { GUILayout.Width(buttonWidth) });
+                GUILayout.EndHorizontal();
+            }
+
             if (string.IsNullOrEmpty(buildName) || !buildPatternRegex.IsMatch(buildName))
             {
                 ++numberHelpBoxes;
-                EditorGUI.HelpBox(new Rect(rect.x + 50, rect.y + numberHelpBoxes * (k_LineHeight + 5), rect.width - 100, k_LineHeight),
+                EditorGUILayout.HelpBox(
                     "Names must be between 2 and 63 characters long and can only contain alpha numeric characters.",
                     MessageType.Error);
             }
 
-            if (GUI.Button(new Rect((rect.width - 150) / 2, rect.y, 150, k_LineHeight), "Build and Upload"))
+
+            string zippedBuildFile = null;
+            if (doBuildUpload)
             {
                 var includedScenes = new List<string>(selectedScenesCount);
                 foreach (var kv in selectedScenes)
@@ -433,8 +461,7 @@ namespace Unity.Simulation.Games.Editor
 
                 if (lastBuildReport.summary.result == BuildResult.Succeeded)
                 {
-                    var id = GameSimApiClient.instance.UploadBuild(buildName, $"{buildLocation}.zip");
-                    Debug.Log($"Build {buildName} uploaded with build id {id}");
+                    zippedBuildFile = $"{buildLocation}.zip";
                 }
                 else
                 {
@@ -450,6 +477,17 @@ namespace Unity.Simulation.Games.Editor
                         }
                     }
                 }
+            }
+
+            if (doUpload)
+            {
+                zippedBuildFile = EditorUtility.OpenFilePanel("game simulation build archive", "", "zip");
+            }
+
+            if (doBuildUpload || doUpload)
+            {
+                var id = GameSimApiClient.instance.UploadBuild(buildName, zippedBuildFile);
+                Debug.Log($"Build {buildName} uploaded with build id {id}");
             }
 
             if (lastBuildReport != null && lastBuildReport.summary.result != BuildResult.Succeeded)
@@ -562,8 +600,12 @@ namespace Unity.Simulation.Games.Editor
         {
             var countLoaded = SceneManager.sceneCount;
             var loadedScenes = new string[countLoaded];
+
             for (int i = 0; i < countLoaded; i++)
+            {
                 loadedScenes[i] = SceneManager.GetSceneAt(i).path;
+            }
+
             return loadedScenes;
         }
 
@@ -628,7 +670,10 @@ namespace Unity.Simulation.Games.Editor
             selectedScenes = new Dictionary<string, bool>();
 
             for (int i = 0; i != Math.Min(_selectedScenesKeys.Count, _selectedScenesValues.Count); i++)
+            {
                 selectedScenes.Add(_selectedScenesKeys[i], _selectedScenesValues[i]);
+            }
         }
     }
+
 }
