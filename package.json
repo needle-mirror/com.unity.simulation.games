@@ -1,7 +1,7 @@
 {
   "name": "com.unity.simulation.games",
   "displayName": "Unity Game Simulation",
-  "version": "0.4.4-preview.4",
+  "version": "0.4.5-preview.1",
   "unity": "2018.4",
   "description": "Unity Game Simulation is a tool that helps you spend less time testing and balancing and more time innovating new in-game experiences for your players. The package will allow developers to implement parameters and metrics to be used in the Unity Game Simulation service.",
   "dependencies": {
@@ -15,11 +15,11 @@
     "sim"
   ],
   "upmCi": {
-    "footprint": "c35a8f61c1b2cf843d921192dc7f920b470bb684"
+    "footprint": "fd7943b14285c8f99bbf02443e15f1dd2bc41e5b"
   },
   "repository": {
     "url": "https://github.cds.internal.unity3d.com/unity/com.unity.simulation.games.git",
     "type": "git",
-    "revision": "1c9dab249265ba0bbc692d59451bfd83cae18e45"
+    "revision": "c1100d09cc5351de0e4a89c1447f66cb877a5e80"
   }
 }

@@ -1,13 +1,8 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.IO;
-using System.Threading;
-using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 using Unity.RemoteConfig.Editor;
 using UnityEngine;
-using UnityEngine.Rendering;
 
 namespace Unity.Simulation.Games.Editor
 {
@@ -34,28 +29,27 @@ namespace Unity.Simulation.Games.Editor
                 "json", typeof(string)
             }
         };
-
-        private static readonly object typeForTaskMut = new object();
-        private static TaskCompletionSource<Type> _typeForTask;
-        private static string _typeKey = null;
-
-        private static BlockingCollection<Tuple<string, TaskCompletionSource<Type>>> _taskCompletionSources = new BlockingCollection<Tuple<string, TaskCompletionSource<Type>>>();
-        private static bool _running = false;
-
-        private static TaskScheduler unityTaskScheduler;
+        
+        private static Dictionary<string, Type> typeDict = new Dictionary<string, Type>();
+        private static bool hasInitialized = false;
 
         /// <summary>
-        /// Initializes the editor utilities; must be called on the main thread. Captures the UnitySynchronizationContext
+        /// Requests parameter type information from remote config and stores it
         /// </summary>
-        /// <exception cref="Exception">Called from outside the main thread</exception>
         public static void Init()
         {
-            if (Thread.CurrentThread.ManagedThreadId != 1)
-            {
-                throw new Exception("Init must be called from the main thread");
-            }
+            RemoteConfigWebApiClient.fetchEnvironmentsFinished += RemoteConfigEnvironmentsFetched;
+            RemoteConfigWebApiClient.FetchEnvironments(Application.cloudProjectId);
+        }
 
-            unityTaskScheduler = TaskScheduler.FromCurrentSynchronizationContext();
+        
+        /// <summary>
+        /// Returns true when the Init method's request has successfully executed
+        /// </summary>
+        /// <returns></returns>
+        public static bool IsInitialized()
+        {
+            return hasInitialized;
         }
 
         /// <summary>
@@ -64,64 +58,9 @@ namespace Unity.Simulation.Games.Editor
         /// <param name="key">The name of the parameter.</param>
         /// <returns>Type of parameter. Valid types are: string, bool, float, int, long, string. Parameters with the json type return string.</returns>
         /// <exception cref="Exception"></exception>
-        public static Task<Type> TypeFor(string key)
+        public static Type TypeFor(string key)
         {
-            if (unityTaskScheduler == null)
-            {
-                throw new Exception("Init must be called from the main thread prior to calling TypeFor");
-            }
-
-            var next = new Tuple<string, TaskCompletionSource<Type>>(key, new TaskCompletionSource<Type>());
-            _taskCompletionSources.TryAdd(next);
-
-            var cloudProjectId = Task.Factory.StartNew(() =>
-            {
-                return Application.cloudProjectId;
-            }, CancellationToken.None, TaskCreationOptions.None, unityTaskScheduler).Result;
-
-            lock (typeForTaskMut)
-            {
-                if (!_running)
-                {
-                    if (_taskCompletionSources.TryTake(out var taken))
-                    {
-                        _running = true;
-
-                        _typeForTask = taken.Item2;
-                        _typeKey = taken.Item1;
-
-                        RemoteConfigWebApiClient.fetchEnvironmentsFinished += RemoteConfigEnvironmentsFetched;
-                        RemoteConfigWebApiClient.FetchEnvironments(cloudProjectId);
-
-                        return Task.Run(async () =>
-                        {
-                            var ret = await _typeForTask.Task;
-                            lock (typeForTaskMut)
-                            {
-                                if (_taskCompletionSources.TryTake(out var taskTaken))
-                                {
-                                    _typeForTask = taskTaken.Item2;
-                                    _typeKey = taskTaken.Item1;
-
-                                    RemoteConfigWebApiClient.fetchEnvironmentsFinished += RemoteConfigEnvironmentsFetched;
-                                    RemoteConfigWebApiClient.FetchEnvironments(cloudProjectId);
-                                }
-                                else
-                                {
-                                    _running = false;
-                                }
-                            }
-
-                            return ret;
-                        });
-                    }
-
-                    // err
-                    throw new Exception("not running but already ran");
-                }
-
-                return next.Item2.Task;
-            }
+            return typeDict[key];
         }
 
         private static void RemoteConfigEnvironmentsFetched(JArray environments)
@@ -140,22 +79,6 @@ namespace Unity.Simulation.Games.Editor
                     break;
                 }
             }
-
-            if (gsEnv == null)
-            {
-                lock (typeForTaskMut)
-                {
-                    if (_typeForTask != null)
-                    {
-                        _typeForTask.SetCanceled();
-                        _typeForTask = null;
-                    }
-
-                    _typeKey = null;
-                }
-
-                throw new InvalidDataException();
-            }
         }
 
         private static void FetchConfig(string envId)
@@ -168,6 +91,7 @@ namespace Unity.Simulation.Games.Editor
         private static void RemoteConfigFetched(JObject config)
         {
             RemoteConfigWebApiClient.fetchConfigsFinished -= RemoteConfigFetched;
+            typeDict.Clear();
 
             if (config.HasValues)
             {
@@ -176,38 +100,19 @@ namespace Unity.Simulation.Games.Editor
                 {
                     var obj = (JObject) t;
 
-                    if (obj.ContainsKey("key") && obj["key"] != null && obj["key"].Value<string>().Equals(_typeKey))
+                    if (obj.ContainsKey("key") && obj["key"] != null && obj["type"] != null)
                     {
                         var type = obj["type"].Value<string>();
 
-                        lock (typeForTaskMut)
+                        if (typeLookup.ContainsKey(type))
                         {
-                            _typeKey = null;
-
-                            Type ret = null;
-
-                            if (typeLookup.ContainsKey(type))
-                            {
-                                ret = typeLookup[type];
-                            }
-
-                            _typeForTask.SetResult(ret);
-                            return;
+                            typeDict[obj["key"].Value<string>()] = typeLookup[type];
                         }
                     }
                 }
             }
 
-            lock (typeForTaskMut)
-            {
-                if (_typeForTask != null)
-                {
-                    _typeForTask.SetCanceled();
-                    _typeForTask = null;
-                }
-
-                _typeKey = null;
-            }
+            hasInitialized = true;
         }
     }
 }

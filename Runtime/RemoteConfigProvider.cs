@@ -14,7 +14,7 @@ namespace Unity.Simulation.Games
         
         private RemoteConfigProvider()
         {
-            configManager = new ConfigManagerImpl("gamesim", "RemoteConfigGS.json", "RemoteConfigHeadersGS.json");
+            configManager = new ConfigManagerImpl("gamesim", "", "RemoteConfigGS.json", "RemoteConfigHeadersGS.json");
         }
 
         public static RemoteConfigProvider Instance { get; } = new RemoteConfigProvider();

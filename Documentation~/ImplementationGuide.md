@@ -12,7 +12,7 @@ To implement the Game Simulation package:
 These steps are described below.
 
 ## Step 1. Install the Game Simulation package
-To download the Game Simulation package, add the following line to your project's dependencies in your `manifest.json` file: `"com.unity.simulation.games": "0.4.4-preview.4",`
+To download the Game Simulation package, add the following line to your project's dependencies in your `manifest.json` file: `"com.unity.simulation.games": "0.4.5-preview.1",`
 
 Unity Game Simulation requires the following packages, and adds these dependencies for you:
 * Remote Config: `"com.unity.remote-config" : "1.4.0-preview.1"`
