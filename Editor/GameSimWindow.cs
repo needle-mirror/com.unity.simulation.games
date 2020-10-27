@@ -61,6 +61,9 @@ namespace Unity.Simulation.Games.Editor
 
         private BuildReport lastBuildReport = null;
         private List<BuildStepMessage> lastBuildErrorMessages = new List<BuildStepMessage>();
+        
+        private GameSimMetrics metrics;
+        private UnityEditor.Editor metricsEditor;
 
         Rect toolbarRect
         {
@@ -339,6 +342,8 @@ namespace Unity.Simulation.Games.Editor
 
         void DrawBuildUpload()
         {
+            EnsureMetricsFileExists();
+
             {
                 GUILayout.BeginHorizontal();
                 GUILayout.FlexibleSpace();
@@ -356,6 +361,22 @@ namespace Unity.Simulation.Games.Editor
             EditorGUILayout.LabelField(kMessageString, EditorStyles.wordWrappedLabel);
 
             DrawScenes();
+
+            var location = Path.Combine("Assets", "..", "Build", string.IsNullOrEmpty(buildName) ? "BuildName" : buildName);
+            EditorGUILayout.LabelField(kLocationText, location);
+            buildName = EditorGUILayout.TextField(kFieldText, buildName);
+            DrawButtons();
+
+            metricsEditor.DrawDefaultInspector();
+        }
+
+        void EnsureMetricsFileExists()
+        {
+            if (metrics == null)
+            {
+                metrics = CreateInstance<GameSimMetrics>();
+                metricsEditor = UnityEditor.Editor.CreateEditor(metrics);
+            }
         }
 
         void DrawParameterSetup()
@@ -407,18 +428,11 @@ namespace Unity.Simulation.Games.Editor
 
                 GUI.EndScrollView();
             }
-
-            var location = Path.Combine("Assets", "..", "Build", string.IsNullOrEmpty(buildName) ? "BuildName" : buildName);
-            var locationRect = new Rect(scrollRect.x, scrollRect.y + scrollRect.height + k_LineHeight, scrollRect.width, k_LineHeight);
-            EditorGUILayout.LabelField(kLocationText, location);
-            var buildNameRect = new Rect(locationRect.x, locationRect.y + locationRect.height, locationRect.width, 20);
-            buildName = EditorGUILayout.TextField(kFieldText, buildName);
-            DrawButtons(new Rect(buildNameRect.x, buildNameRect.y + buildNameRect.height + k_LineHeight, rect.width, k_LineHeight));
         }
 
 
         private readonly Regex buildPatternRegex = new Regex(@"^[a-zA-Z0-9]{2,63}$");
-        void DrawButtons(Rect rect)
+        void DrawButtons()
         {
             int numberHelpBoxes = 0;
 
@@ -486,40 +500,32 @@ namespace Unity.Simulation.Games.Editor
 
             if (doBuildUpload || doUpload)
             {
-                var id = GameSimApiClient.instance.UploadBuild(buildName, zippedBuildFile);
+                var id = GameSimApiClient.instance.UploadBuild(buildName, zippedBuildFile, metrics.metrics);
                 Debug.Log($"Build {buildName} uploaded with build id {id}");
             }
 
             if (lastBuildReport != null && lastBuildReport.summary.result != BuildResult.Succeeded)
             {
-                DisplayBuildErrors(rect, ref numberHelpBoxes);
+                DisplayBuildErrors(ref numberHelpBoxes);
             }
 
             EditorGUI.EndDisabledGroup();
         }
 
-        private void DisplayBuildErrors(Rect rect, ref int numberHelpBoxes)
+        private void DisplayBuildErrors(ref int numberHelpBoxes)
         {
             if (lastBuildErrorMessages.Count > 0)
             {
                 foreach (var message in lastBuildErrorMessages)
                 {
                     ++numberHelpBoxes;
-                    EditorGUI.HelpBox(
-                        new Rect(rect.x + 50, rect.y + numberHelpBoxes * (k_LineHeight + 5), rect.width - 100,
-                            k_LineHeight),
-                        message.content,
-                        MessageType.Error);
+                    EditorGUILayout.HelpBox(message.content, MessageType.Error);
                 }
             }
             else
             {
                 ++numberHelpBoxes;
-                EditorGUI.HelpBox(
-                    new Rect(rect.x + 50, rect.y + numberHelpBoxes * (k_LineHeight + 5), rect.width - 100,
-                        k_LineHeight),
-                    "Unknown Error",
-                    MessageType.Error);
+                EditorGUILayout.HelpBox("Unknown Error", MessageType.Error);
             }
         }
 
@@ -673,6 +679,17 @@ namespace Unity.Simulation.Games.Editor
             {
                 selectedScenes.Add(_selectedScenesKeys[i], _selectedScenesValues[i]);
             }
+        }
+
+        void OnDestroy()
+        {
+            if (metrics != null)
+            {
+                DestroyImmediate(metrics);
+            }
+            
+            metrics = null;
+            metricsEditor = null;
         }
     }
 

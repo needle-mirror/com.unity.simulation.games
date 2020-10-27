@@ -1,9 +1,9 @@
 {
     "name": "Unity.Simulation.Games.Editor",
     "references": [
-        "Unity.RemoteConfig.Editor"
+        "Unity.RemoteConfig.Editor",
+        "Unity.Settings.Editor"
     ],
-    "optionalUnityReferences": [],
     "includePlatforms": [
         "Editor"
     ],
@@ -13,5 +13,6 @@
     "precompiledReferences": [],
     "autoReferenced": true,
     "defineConstraints": [],
-    "versionDefines": []
+    "versionDefines": [],
+    "noEngineReferences": false
 }

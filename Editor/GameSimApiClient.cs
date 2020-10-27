@@ -21,11 +21,12 @@ namespace Unity.Simulation.Games.Editor
         /// </summary>
         /// <param name="name">build name for display in Unity Game Simulation's web ui</param>
         /// <param name="location">zip file containing the build</param>
+        /// <param name="simulationMetrics">list of metrics associated with this build</param>
         /// <returns>build id from Unity Game Simulation platform services</returns>
-        public string UploadBuild(string name, string location)
+        public string UploadBuild(string name, string location, List<string> simulationMetrics)
         {
             Save(true);
-            return Transaction.Upload($"{gamesimUrl}/v1/builds?projectId={Application.cloudProjectId}", name, location);
+            return Transaction.Upload($"{gamesimUrl}/v1/builds?projectId={Application.cloudProjectId}", name, location, simulationMetrics);
         }
 
         /// <summary>
@@ -85,12 +86,12 @@ namespace Unity.Simulation.Games.Editor
 
     internal static class Transaction
     {
-        public static string Upload(string url, string name, string inFile, bool useTransferUrls = true)
+        public static string Upload(string url, string name, string inFile, List<string> simulationMetrics, bool useTransferUrls = true)
         {
-            return Upload(url, name, File.ReadAllBytes(inFile), useTransferUrls);
+            return Upload(url, name, File.ReadAllBytes(inFile), simulationMetrics, useTransferUrls);
         }
 
-        public static string Upload(string url, string name, byte[] data, bool useTransferUrls = true)
+        public static string Upload(string url, string name, byte[] data, List<string> simulationMetrics, bool useTransferUrls = true)
         {
             string entityId = null;
 
@@ -122,7 +123,7 @@ namespace Unity.Simulation.Games.Editor
 
             if (useTransferUrls)
             {
-                var tuple = GetUploadURL(url, name);
+                var tuple = GetUploadURL(url, name, simulationMetrics);
                 entityId = tuple.Item2;
                 using (var webrx = UnityWebRequest.Put(tuple.Item1, data))
                 {
@@ -142,9 +143,9 @@ namespace Unity.Simulation.Games.Editor
             return entityId;
         }
 
-        public static Tuple<string, string> GetUploadURL(string url, string path)
+        public static Tuple<string, string> GetUploadURL(string url, string path, List<string> simulationMetrics)
         {
-            var payload = JsonUtility.ToJson(new UploadInfo(Path.GetFileName(path), "Placeholder description"));
+            var payload = JsonUtility.ToJson(new UploadInfo(Path.GetFileName(path), "Placeholder description", simulationMetrics));
 
             using (var webrx = UnityWebRequest.Post(url, payload))
             {
@@ -175,10 +176,12 @@ namespace Unity.Simulation.Games.Editor
     {
         public string name;
         public string description;
-        public UploadInfo(string name, string description)
+        public List<string> simulationMetrics;
+        public UploadInfo(string name, string description, List<string> simulationMetrics)
         {
             this.name = name;
             this.description = description;
+            this.simulationMetrics = simulationMetrics;
         }
     }
     
@@ -193,7 +196,7 @@ namespace Unity.Simulation.Games.Editor
     
     internal static class Utils
     {
-        internal const string pacakgeVersion = "0.4.5-preview.1";
+        internal const string pacakgeVersion = "0.4.5-preview.2";
 
         internal static Dictionary<string, string> GetAuthHeader(string tokenString)
         {
