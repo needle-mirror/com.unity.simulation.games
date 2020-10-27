@@ -3,8 +3,8 @@ Use this file to outline the test strategy for this package.
 
 ## Version tested: [0.0.0]
 
-## QA Owner: @rambod
-## UX Owner: @rambod
+## QA Owner: @tom.thompson
+## UX Owner: @tom.thompson
 
 ## Test strategy
 *Use this section to describe how this feature was tested.*

@@ -6,8 +6,12 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 
+## [0.4.5-preview.3] - 2020-10-27
+## This is the v0.4.5-preview.3 release of *Unity Game Simulation*
+- fix issue with the editor window in linux
+
 ## [0.4.5-preview.2] - 2020-10-27
-## This is the v0.4.5-preview.1 release of *Unity Game Simulation*
+## This is the v0.4.5-preview.2 release of *Unity Game Simulation*
 - add metric names to editor window
 
 ## [0.4.5-preview.1] - 2020-09-21

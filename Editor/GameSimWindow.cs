@@ -470,6 +470,7 @@ namespace Unity.Simulation.Games.Editor
                 }
 
                 var buildLocation = Path.Combine(Application.dataPath, "..", "Build", buildName);
+                buildLocation = Path.GetFullPath(buildLocation);  // fixes issue in linux, need to not have the Assets folder in the path
                 Directory.CreateDirectory(buildLocation);
                 lastBuildReport = BuildProject(buildLocation, buildName, includedScenes.ToArray(), BuildTarget.StandaloneLinux64, compress: true, launch: false);
 
