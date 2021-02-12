@@ -57,6 +57,28 @@ namespace Unity.Simulation.Games
 #endif
 
         /// <summary>
+        ///  Returns a list of counters in memory with metadata
+        /// </summary>
+        /// <param name="instanceId"></param>
+        /// <param name="attemptId"></param>
+        /// <param name="gameSimSettings"></param>
+        /// <returns>CountersData</returns>
+        public string GetCounters(string instanceId, string attemptId = "", string gameSimSettings = "")
+        {
+#if UNITY_GAME_SIMULATION || UNITY_EDITOR
+            Metadata metadata = new Metadata(instanceId, attemptId, gameSimSettings);
+            lock (_mutex)
+            {
+                var counters = new CountersData(_counters, metadata);
+                return JsonConvert.SerializeObject(counters, new JsonSerializerSettings
+                {
+                    NullValueHandling = NullValueHandling.Ignore
+                });
+            }
+#endif
+        }
+
+        /// <summary>
         /// Increment the counter with a certain number
         /// </summary>
         /// <param name="name">Name of the counter to increment.</param>

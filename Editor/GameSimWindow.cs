@@ -1,15 +1,20 @@
-using System.Collections.Generic;
-using System.Text.RegularExpressions;
-using UnityEngine;
-using UnityEditor;
-using Unity.RemoteConfig.Editor;
-using Unity.RemoteConfig.Editor.UIComponents;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
-using UnityEngine.SceneManagement;
-using System.IO;
-using UnityEditor.Build.Reporting;
 using System.Diagnostics;
+using System.IO;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text.RegularExpressions;
+using Unity.RemoteConfig.Editor;
+using Unity.RemoteConfig.Editor.UIComponents;
+using Unity.Simulation.Games.Editor.UIComponents;
+using UnityEditor;
+using UnityEditor.Build.Reporting;
+using UnityEngine;
+using UnityEditor.IMGUI.Controls;
+using UnityEngine.Networking;
+using UnityEngine.SceneManagement;
 using ZipUtility;
 using Debug = UnityEngine.Debug;
 
@@ -17,26 +22,71 @@ namespace Unity.Simulation.Games.Editor
 {
     internal class GameSimWindow : EditorWindow, ISerializationCallbackReceiver
     {
+        // GUI Copy
+        const string kMessageString =
+        "Create and upload a Linux build for simulation. Note: we will include the scenes from your most recent build. " +
+        "If you haven't uploaded a build yet, we will include the open scenes in your project. " +
+        "Specify a build name, and select the scenes you want to include from the list.";
+        const string kScenesInBuild = "Scenes In Build";
+        const string kNoScenesText = "No Scenes Loaded. Either load one or more scenes, or select scenes to include in the Build Settings dialog.";
+        const string kLocationText = "Build Location";
+        const string kFieldText = "Build Name";
+        const string kSignUpText = "Sign Up";
+        const string kGoToDashboardText = "Go To Dashboard";
+        const string kHelpText = "Go To Forum";
+        const string kWebRequestErrorText = "Looks like something went wrong.  Need help?  Please reach out to us by posting on our forum by clicking the button below.";
+        const string kNoParametersFoundText = "No parameters found for selected Build.";
+        const string kCreateSimulationSuccessBtnText = "View Simulation Details";
+        const string kCreateSimulationSuccessText = "Visit the Game Simulation dashboard to view your simulation results.";
+        const string kParametersLabelText = "Parameters: ";
+        const string kJobNameLabelText = "Name: ";
+        const string kJobNameSublabelText = "The name of your simulation";
+        const string kBuildIdLabelText = "Build ID: ";
+        const string kBuildIdSublabelText = "The ID of the build you want to run";
+        const string kMaxRuntimeLabelText = "Max Runtime per Run: ";
+        const string kMaxRuntimeSublabelText = "Max runtime per run instance (in minutes)";
+        const string kMaxRunsLabelText = "Runs per Parameter Combination: ";
+        const string kMaxRunsSublabelText = "Number of runs per parameter values combination";
+        const string kParametersSublabelText =
+            "The parameters you want to simulate in your simulation.  List comma-separated values in the Values text field to test multiple parameters for a given key e.g. '1, 2, 3'";
+        private const string kMessageTypeError = "error";
+        private const string kMessageTypeWarning = "warning";
+        private const string kMessageTypeInfo = "info";
+        private const string kHelpIconHoverText = "View the editor window documentation for more info";
+        
+        //UI Style variables
+        const float k_LineHeight = 22f;
+        const float k_LineHeightBuffer = k_LineHeight - 2;
+        const float k_LinePadding = 5f;
+        private GUIStyle guiStyleLabel = new GUIStyle();
+        private GUIStyle guiStyleSubLabel = new GUIStyle();
+
+        // Window Tabs Variables
         private enum GameSimTabs : int
         {
             parameterSetUp,
             buildUpload,
+            createSimulation,
         };
 
-        SettingsTreeview treeview;
+        GameSimTabs selectedTab = 0;
 
+        // Are Services Enabled Variables
+        GUIContent servicesNotEnabledContent = new GUIContent("To get started with Unity Game Simulation, you must first link your project to a Unity Cloud Project ID. A Unity Cloud Project ID is an online identifier which is used across all Unity Services. These can be created within the Services window itself, or online on the Unity Services website. The simplest way is to use the Services window within Unity, as follows: \nTo open the Services Window, go to Window > General > Services.\nNote: using Unity Game Simulation does not require that you turn on any additional, individual cloud services like Analytics, Ads, Cloud Build, etc.");
+        GUIContent missingEntitlementContent = new GUIContent("The Beta period for Unity Game Simulation has ended.  To continue using Game Simulation, please re-enroll through our self serve portal by clicking the button below.");
+        bool isMakingHttpCall = false;
+        bool hasEntitlement = true;
+        bool hasWebRequestError = false;
+
+        // Parameter Setup Variables
+        SettingsTreeview treeview;
         string environmentId;
         string configId;
-
         JArray settings = new JArray();
         string _settings;
-        const float k_LineHeight = 22f;
         const int buttonWidth = 110;
 
-        GUIContent servicesNotEnabledContent = new GUIContent("To get started with Unity Game Simulation, you must first link your project to a Unity Cloud Project ID. A Unity Cloud Project ID is an online identifier which is used across all Unity Services. These can be created within the Services window itself, or online on the Unity Services website. The simplest way is to use the Services window within Unity, as follows: \nTo open the Services Window, go to Window > General > Services.\nNote: using Unity Game Simulation does not require that you turn on any additional, individual cloud services like Analytics, Ads, Cloud Build, etc.");
-
-        bool isMakingHttpCall = false;
-
+        // Build Upload Variables
         int selectedScenesCount;
         string[] buildSettingsScenes;
         string[] openScenes;
@@ -46,25 +96,41 @@ namespace Unity.Simulation.Games.Editor
         List<string> _selectedScenesKeys = new List<string>();
         List<bool> _selectedScenesValues = new List<bool>();
         const int kScrollViewWidth = 490;
-
-        GameSimTabs selectedTab = 0;
-
-        const string kMessageString =
-        "Create and upload a Linux build for simulation. Note: we will include the scenes from your most recent build. " +
-        "If you haven't uploaded a build yet, we will include the open scenes in your project. " +
-        "Specify a build name, and select the scenes you want to include from the list.";
-
-        const string kScenesInBuild = "Scenes In Build";
-        const string kNoScenesText = "No Scenes Loaded. Either load one or more scenes, or select scenes to include in the Build Settings dialog.";
-        const string kLocationText = "Build Location";
-        const string kFieldText = "Build Name";
-
         private BuildReport lastBuildReport = null;
         private List<BuildStepMessage> lastBuildErrorMessages = new List<BuildStepMessage>();
-        
+
+        // Metrics Variables
         private GameSimMetrics metrics;
         private UnityEditor.Editor metricsEditor;
 
+        // Create Simulation Variables
+        Dictionary<string, string> GameSimLinks = new Dictionary<string, string>() {
+            {"forum", "https://forum.unity.com/forums/unity-game-simulation.472"},
+            {"package", "https://docs.unity3d.com/Packages/com.unity.simulation.games@0.4/manual/index.html"},
+        };
+        Dictionary<string, MessageType> CreateJobMessageDict = new Dictionary<string, MessageType>() {
+            {kMessageTypeWarning, MessageType.Warning},
+            {kMessageTypeError, MessageType.Error},
+            {kMessageTypeInfo, MessageType.Info},
+        };
+        string jobId = null;
+        bool hasEmptyParameters = false;
+
+        const int RedirectBtnWidth = 210;
+        private UnityWebRequestAsyncOperation GetSimulationBuilds = null;
+        private string jobName = "MySimulationName";
+        private string buildId;
+        List<string> BuildIdsList = new List<string>();
+        string[] BuildMenuOptions;
+        string selectedBuild;
+        string maxRuntime = "15";
+        string maxRuns = "5";
+        string values;
+        //// Simulation Parameter Treeview
+        [SerializeField] TreeViewState _simulationParametersTreeviewState;
+        private GameSimParametersTreeview _simulationParametersTreeview;
+
+        // Treeview Rects
         Rect toolbarRect
         {
             get
@@ -97,6 +163,22 @@ namespace Unity.Simulation.Games.Editor
             }
         }
 
+        Rect paramTreeviewRect
+        {
+            get
+            {
+                return new Rect(treeviewToolbarRect.x, treeviewToolbarRect.y + treeviewToolbarRect.height, position.width, position.height - toolbarRect.height - treeviewToolbarRect.height);
+            }
+        }
+        
+        Rect paramTreeviewFooterRect
+        {
+            get
+            {
+                return new Rect(0, paramTreeviewRect.y + paramTreeviewRect.height-3f, paramTreeviewRect.width, k_LineHeight);
+            }
+        }
+
         [MenuItem("Window/Game Simulation")]
         public static void GetWindow()
         {
@@ -109,11 +191,74 @@ namespace Unity.Simulation.Games.Editor
 
         private void OnEnable()
         {
+            // Initialize button links
+            GameSimLinks.Add("selfServePortal", $"https://dashboard.unity3d.com/organizations/{CloudProjectSettings.organizationId}/metered-billing/marketplace/products/2771b1e8-4d77-4b34-9b9d-7d6f15ca6ba1");
+            GameSimLinks.Add("dashboard", $"https://gamesimulation.unity3d.com/simulations?projectId={Application.cloudProjectId}");
+
+            // Parameter Setup Tab Treeview
             treeview = new SettingsTreeview("Add Parameter", "Parameter", "Default Value");
             treeview.activeSettingsList = new JArray();
             treeview.OnSettingChanged += Treeview_OnSettingChanged;
             RemoteConfigWebApiClient.fetchEnvironmentsFinished += RemoteConfigWebApiClient_fetchEnvironmentsFinished;
-            ResetState();
+
+            // Create Job Tab Parameter Treeview 
+            var keyColumn = new MultiColumnHeaderState.Column()
+             {
+                 headerContent = new GUIContent("Parameter"),
+                 headerTextAlignment = TextAlignment.Center,
+                 canSort = false,
+                 width = 210,
+                 minWidth = 50,
+                 autoResize = true,
+                 allowToggleVisibility = false
+             };
+            var typeColumn = new MultiColumnHeaderState.Column()
+            {
+                headerContent = new GUIContent("Type"),
+                headerTextAlignment = TextAlignment.Center,
+                canSort = false,
+                width = 70,
+                minWidth = 50,
+                autoResize = true,
+                allowToggleVisibility = false
+            };
+            var defaultValueColumn = new MultiColumnHeaderState.Column()
+            {
+                headerContent = new GUIContent("Default Value"),
+                headerTextAlignment = TextAlignment.Center,
+                canSort = false,
+                width = 150,
+                minWidth = 50,
+                autoResize = true,
+                allowToggleVisibility = false
+            };
+            var valuesColumn = new MultiColumnHeaderState.Column()
+            {
+                headerContent = new GUIContent("Values"),
+                headerTextAlignment = TextAlignment.Center,
+                canSort = false,
+                width = 210,
+                minWidth = 50,
+                autoResize = true,
+                allowToggleVisibility = false
+            };
+
+            var headerState = new MultiColumnHeaderState(new MultiColumnHeaderState.Column[]
+                { keyColumn, typeColumn, defaultValueColumn, valuesColumn });
+
+            var _simulationMultiColumnHeader = new MultiColumnHeader(headerState);
+
+            // Check whether there is already a serialized view state (state 
+            // that survived assembly reloading)
+            if (_simulationParametersTreeviewState == null)
+                _simulationParametersTreeviewState = new TreeViewState();
+
+            // Create TreeView with column header 
+            if (_simulationParametersTreeviewState != null)
+            {
+                _simulationParametersTreeview = new GameSimParametersTreeview(_simulationParametersTreeviewState, _simulationMultiColumnHeader);
+            }
+
         }
 
         void InitIfNeeded()
@@ -127,23 +272,156 @@ namespace Unity.Simulation.Games.Editor
         public void ResetState()
         {
             isMakingHttpCall = false;
+            if (EditorPrefs.HasKey("isEntitled"))
+                hasEntitlement = EditorPrefs.GetBool("isEntitled", false);
+
             environmentId = null;
             configId = null;
         }
 
         private bool AreServicesEnabled()
         {
+            GUIStyle style = GUI.skin.label;
+
             if (string.IsNullOrEmpty(CloudProjectSettings.projectId) || string.IsNullOrEmpty(CloudProjectSettings.organizationId))
             {
-
-                GUIStyle style = GUI.skin.label;
                 style.wordWrap = true;
                 EditorGUILayout.LabelField(servicesNotEnabledContent, style);
                 return false;
             }
+            
+            if (!hasEntitlement)  
+            {
+                EditorGUILayout.LabelField(missingEntitlementContent, style);
+                GUILayout.BeginHorizontal();
+                GUILayout.FlexibleSpace();
+                if (GUILayout.Button(kSignUpText, new[] { GUILayout.Width(RedirectBtnWidth) }))
+                {
+                    Help.BrowseURL(GameSimLinks["selfServePortal"]);
+                }
+                GUILayout.EndHorizontal();
+                return false;
+            }
+
+            if (hasWebRequestError)
+            {
+                Debug.LogWarning("Web Request Error: " + kWebRequestErrorText);
+                string errorMessage = kWebRequestErrorText;
+                EditorGUILayout.LabelField(errorMessage, style);
+                GUILayout.BeginHorizontal();
+                GUILayout.FlexibleSpace();
+                if (GUILayout.Button(kHelpText, new[] { GUILayout.Width(RedirectBtnWidth) }))
+                {
+                    Help.BrowseURL(GameSimLinks["forum"]);
+                }
+                GUILayout.EndHorizontal();
+                return false;
+            }
+
             return true;
         }
 
+        private void showMessage(Rect messageRect, string messageText, string messageType = "warning")
+        {
+            EditorGUI.HelpBox(messageRect, messageText, CreateJobMessageDict[messageType]);
+        }
+        
+        private void CreateBuildDropdown(float currentY, Rect parameterPaneRect)
+        {
+            var labelX = parameterPaneRect.x + 5;
+            var textFieldX = labelX + 260f;
+            var textFieldWidth = parameterPaneRect.width / 3;
+            var labelHeight = (k_LineHeightBuffer * .8f);
+            var subLabelHeight = (k_LineHeightBuffer * .8f);
+            var subLabelColor = new Color(0.4f, 0.4f, 0.4f, 1.0f);
+            var buttonSize = 25f;
+            
+            guiStyleLabel = GUI.skin.label;
+            guiStyleSubLabel.fontSize = 8;
+            guiStyleSubLabel.normal.textColor = subLabelColor;
+            guiStyleSubLabel.alignment = TextAnchor.UpperLeft;
+            guiStyleSubLabel.padding = new RectOffset(2, 0, 0, 2);
+            Texture helpButtonTexture = EditorGUIUtility.FindTexture("_Help");
+        
+            GUI.Label(new Rect(labelX, currentY, 260f, k_LineHeightBuffer), kBuildIdLabelText);
+            GUI.Label(new Rect(labelX, currentY + labelHeight, 260f, subLabelHeight), kBuildIdSublabelText, guiStyleSubLabel);
+            var textFieldRect = new Rect(textFieldX, currentY, textFieldWidth, k_LineHeightBuffer);
+            EditorGUIUtility.AddCursorRect(textFieldRect, MouseCursor.Text);
+            if (GUI.Button(new Rect(textFieldX - (2f * buttonSize), currentY, buttonSize, buttonSize), new GUIContent(helpButtonTexture, "View the editor window documentation for more info"), new GUIStyle(GUIStyle.none)))
+            {
+                Help.BrowseURL(GameSimLinks["package"]);
+            }
+            void handleItemClicked(object build)
+            {
+                selectedBuild = build.ToString();
+            }
+            
+            if (GUI.Button(textFieldRect, selectedBuild, EditorStyles.popup))
+            {
+                var menu = new GenericMenu();
+                foreach (var build in BuildMenuOptions)
+                    CreateDropdownItemForBuilds(build, menu, handleItemClicked);
+                menu.DropDown(textFieldRect);
+            }
+        }
+        
+        private void CreateDropdownItemForBuilds(string buildId, GenericMenu menu, GenericMenu.MenuFunction2 Callback)
+        {
+            menu.AddItem(new GUIContent(buildId), string.Equals(buildId, selectedBuild), Callback, buildId);
+        }
+
+        private string CreateLabelWithSubLabelTextFieldAndHelpButton(string labelText, string subLabelText, string textFieldText, float currentY, Rect currentRect)
+        {
+            var labelX = currentRect.x + 5;
+            var labelWidth = 255f;
+            var textFieldX = labelX + labelWidth + 5;
+            var textFieldWidth = currentRect.width - labelWidth - 15;
+            var labelHeight = (k_LineHeightBuffer * .8f);
+            var subLabelHeight = (k_LineHeightBuffer * .8f);
+            var subLabelColor = new Color(0.4f, 0.4f, 0.4f, 1.0f);
+            var buttonSize = 25f;
+
+            guiStyleLabel = GUI.skin.label;
+            guiStyleSubLabel.fontSize = 8;
+            guiStyleSubLabel.normal.textColor = subLabelColor;
+            guiStyleSubLabel.alignment = TextAnchor.UpperLeft;
+            guiStyleSubLabel.padding = new RectOffset(2, 0, 0, 2);
+            Texture helpButtonTexture = EditorGUIUtility.FindTexture("_Help");
+
+            GUI.Label(new Rect(labelX, currentY, labelWidth, labelHeight), labelText, guiStyleLabel);
+            GUI.Label(new Rect(labelX, currentY + labelHeight, labelWidth, subLabelHeight), subLabelText, guiStyleSubLabel);
+            var textFieldRect = new Rect(textFieldX, currentY, textFieldWidth, k_LineHeightBuffer);
+            EditorGUIUtility.AddCursorRect(textFieldRect, MouseCursor.Text);
+            if (GUI.Button(new Rect(textFieldX - (2f * buttonSize), currentY, buttonSize, buttonSize), new GUIContent(helpButtonTexture, kHelpIconHoverText), new GUIStyle(GUIStyle.none)))
+            {
+                Help.BrowseURL(GameSimLinks["package"]);
+            }
+
+            return GUI.TextField(textFieldRect, textFieldText);
+        }
+        
+        private void CreateLabelWithSubLabel(string labelText, string subLabelText, float currentY, Rect currentRect)
+        {
+            var labelX = currentRect.x + 5;
+            var labelWidth = 125f;
+            var textFieldX = labelX + labelWidth + 5;
+            var textFieldWidth = currentRect.width - labelWidth - 15;
+            var labelHeight = (k_LineHeightBuffer * 0.8f);
+            var subLabelHeight = (k_LineHeightBuffer * 0.8f);
+            var subLabelColor = new Color(0.4f, 0.4f, 0.4f, 1.0f);
+
+            guiStyleLabel = GUI.skin.label;
+            guiStyleSubLabel.fontSize = 8;
+            guiStyleSubLabel.normal.textColor = subLabelColor;
+            guiStyleSubLabel.alignment = TextAnchor.UpperLeft;
+            guiStyleSubLabel.padding = new RectOffset(2,0,0,2);
+
+            GUI.Label(new Rect(labelX, currentY, labelWidth, labelHeight), labelText, guiStyleLabel);
+            GUI.Label(new Rect(labelX, currentY+labelHeight, labelWidth, subLabelHeight), subLabelText, guiStyleSubLabel);
+            var textFieldRect = new Rect(textFieldX, currentY, textFieldWidth, k_LineHeightBuffer);
+            EditorGUIUtility.AddCursorRect(textFieldRect, MouseCursor.Text);
+        }
+        
         private void Treeview_OnSettingChanged(JObject arg1, JObject arg2)
         {
             if (arg1 == null && arg2 != null)
@@ -246,6 +524,27 @@ namespace Unity.Simulation.Games.Editor
                 configId = config["id"].Value<string>();
                 settings = AddMetadataToSettings((JArray)config["value"]);
                 UpdateSettingsTreeview(settings);
+
+                if (_simulationParametersTreeview != null)
+                {
+                    var items = new List<GameSimParametersTreeElement>();
+            
+                    foreach (var setting in settings)
+                    {
+                        var element = new GameSimParametersTreeElement
+                        {
+                            Key = (string)setting["rs"]["key"],
+                            Type = (string)setting["rs"]["type"],
+                            DefaultValue = (string)setting["rs"]["value"],
+                            Values = ""
+                        };
+            
+                        items.Add(element);
+                    }
+
+                    _simulationParametersTreeview?.Setup(items.ToArray());
+                }
+
             }
             else
             {
@@ -311,7 +610,6 @@ namespace Unity.Simulation.Games.Editor
             {
                 return;
             }
-
             InitIfNeeded();
             EditorGUI.BeginDisabledGroup(isMakingHttpCall);
 
@@ -322,19 +620,25 @@ namespace Unity.Simulation.Games.Editor
 
             {
                 EditorGUILayout.BeginVertical();
-                selectedTab = (GameSimTabs)GUILayout.Toolbar((int)selectedTab, new[] {"Parameter Set Up", "Build Upload"});
+                selectedTab = (GameSimTabs)GUILayout.Toolbar((int)selectedTab, new[] {"Parameter Set Up", "Build Upload", "Create Simulation"});
 
                 switch (selectedTab)
                 {
                     case GameSimTabs.buildUpload:
                         DrawBuildUpload();
+                        GetSimulationBuilds = null;
                         break;
                     case GameSimTabs.parameterSetUp:
                         DrawParameterSetup();
+                        GetSimulationBuilds = null;
+                        break;
+                    case GameSimTabs.createSimulation:
+                        CreateSimulationBoot();
+                        DrawCreateSimulation();
                         break;
                 }
 
-                EditorGUILayout.EndVertical();
+             EditorGUILayout.EndVertical();
             }
 
             EditorGUI.EndDisabledGroup();
@@ -347,9 +651,9 @@ namespace Unity.Simulation.Games.Editor
             {
                 GUILayout.BeginHorizontal();
                 GUILayout.FlexibleSpace();
-                if (GUILayout.Button("Create Simulation", new[] {GUILayout.Width(buttonWidth)}))
+                if (GUILayout.Button(kGoToDashboardText, new[] { GUILayout.Width(RedirectBtnWidth) }))
                 {
-                    Help.BrowseURL($"https://gamesimulation.unity3d.com/simulations/new?projectId={Application.cloudProjectId}");
+                    Help.BrowseURL(GameSimLinks["dashboard"]);
                 }
 
                 GUILayout.EndHorizontal();
@@ -383,22 +687,205 @@ namespace Unity.Simulation.Games.Editor
         {
             DrawToolbar(treeviewToolbarRect);
             treeview.OnGUI(treeviewRect);
+           
+        }
+
+        void CreateSimulationBoot()
+        {
+            
+            if (GetSimulationBuilds == null)
+            {
+                GetSimulationBuilds = GameSimApiClient.instance.GetBuilds();
+            }
+
+            if (GetSimulationBuilds.isDone)
+            {
+                // Error handler
+                if (GetSimulationBuilds.webRequest.isHttpError)
+                {
+                    if (GetSimulationBuilds.webRequest.responseCode == 403)
+                    {
+                        EditorPrefs.SetBool("isEntitled", false);  // sets entitlement status to EditorPrefs
+                    }
+                    else
+                    {
+                        hasWebRequestError = true;
+                        Debug.LogWarning("Error: " + GetSimulationBuilds.webRequest.error);
+                    }
+                }
+                else {
+                    EditorPrefs.SetBool("isEntitled", true);
+                    // Parse and populate builds drop down menu on create simulation form
+                    string buildsJsonResponse = GetSimulationBuilds.webRequest.downloadHandler.text;
+                    JObject parsedBuildsResponse = JObject.Parse(buildsJsonResponse);
+                    var buildIds = from p in parsedBuildsResponse["builds"] select (string)p["buildId"];
+                    foreach (var item in buildIds)
+                    {
+                        BuildIdsList.Add($"{item}");
+                    }
+                    BuildMenuOptions = BuildIdsList.ToArray();
+                } 
+            }
+
+        }
+        void DrawCreateSimulation()
+        {
+            // Create Simulation Form
+            bool doCreateSimulation = false;
+            var createSimulationRect = new Rect(paramTreeviewRect.x, paramTreeviewRect.y, paramTreeviewRect.width, k_LineHeight);
+            var currentY = createSimulationRect.y;
+            var messageRect = new Rect(paramTreeviewRect.x,paramTreeviewFooterRect.y * .95f - (k_LineHeight * 2), createSimulationRect.width - k_LinePadding, k_LineHeight * 1.5f);
+            
+            var settingsCount = settings.Count;
+            int numErrors = 0;
+
+            EditorGUILayout.LabelField("Create and run a simulation using the form below", EditorStyles.wordWrappedLabel);
+            
+            var nameRect = new Rect(createSimulationRect.x, createSimulationRect.y, createSimulationRect.width * .65f, createSimulationRect.height);
+            
+            jobName = CreateLabelWithSubLabelTextFieldAndHelpButton(kJobNameLabelText, kJobNameSublabelText, jobName, currentY, nameRect);
+            currentY += 1.4f*k_LineHeight;
+            
+            if (BuildMenuOptions == null)
+                return;
+            
+            if (BuildMenuOptions.Length > 0)
+            {
+                CreateBuildDropdown(currentY, createSimulationRect);
+                currentY += 1.4f*k_LineHeight;
+            }
+
+            maxRuns = CreateLabelWithSubLabelTextFieldAndHelpButton(kMaxRunsLabelText, kMaxRunsSublabelText, maxRuns,
+                currentY, nameRect);
+            currentY += 1.4f*k_LineHeight;
+            
+            maxRuntime = CreateLabelWithSubLabelTextFieldAndHelpButton(kMaxRuntimeLabelText, kMaxRuntimeSublabelText, maxRuntime,
+                currentY, nameRect);
+            currentY += 1.4f*k_LineHeight;
+            
+            if (settingsCount <= 0)
+            {
+                CreateLabelWithSubLabel(kParametersLabelText, kNoParametersFoundText, currentY, createSimulationRect);
+                currentY += 1.4f*k_LineHeight;
+            }
+            else
+            {
+                CreateLabelWithSubLabel(kParametersLabelText, kParametersSublabelText, currentY, createSimulationRect);
+                currentY += 1.4f*k_LineHeight;
+            }
+
+            var parameterTableRect = new Rect(createSimulationRect.x, currentY, createSimulationRect.width, createSimulationRect.height * 5);
+            _simulationParametersTreeview.OnGUI(parameterTableRect);
+           
+            EditorGUI.BeginDisabledGroup(!string.IsNullOrEmpty(jobId) || string.IsNullOrEmpty(jobName) || !jobNamePatternRegex.IsMatch(jobName) || string.IsNullOrEmpty(maxRuns) ||  selectedBuild == null || !string.IsNullOrEmpty(jobId));
+            if (GUI.Button(
+                new Rect(k_LinePadding / 2, paramTreeviewFooterRect.y * .95f, createSimulationRect.width - k_LinePadding, k_LineHeight),
+                "Run"))
+            {
+                doCreateSimulation = true;
+            }
+            EditorGUI.EndDisabledGroup();
+
+            if (doCreateSimulation && jobId == null)
+            {
+                var parameters = _simulationParametersTreeview.parameterDict;
+                hasEmptyParameters = parameters.Values.Any(p => string.IsNullOrEmpty(p.Item2));
+
+                if (hasEmptyParameters)
+                {
+                    Debug.LogWarning("1 or more Parameter Values required for each parameter in Create Simulation form");
+                }
+                
+                GameSimAnalytics.SendEvent(true);
+                var CreateJobResponse = GameSimApiClient.instance.CreateJob(
+                    jobName,
+                    selectedBuild,
+                    parameters,
+                    maxRuns,
+                    maxRuntime
+                );
+                jobId = CreateJobResponse;
+            }
+
+            // Create job success message
+            if (!doCreateSimulation && !string.IsNullOrEmpty(jobId))
+            {
+                Debug.Log($"Simulation created with id: {jobId}");
+                showMessage(messageRect, $"Simulation created with id: {jobId} " + kCreateSimulationSuccessText, kMessageTypeInfo);
+                if (GUI.Button(
+                    new Rect(k_LinePadding / 2, paramTreeviewFooterRect.y * .85f - k_LineHeight , createSimulationRect.width - k_LinePadding, k_LineHeight),
+                    kCreateSimulationSuccessBtnText))
+                {
+                    Help.BrowseURL(GameSimLinks["dashboard"]);
+                }
+                if (GUI.Button(
+                    new Rect(k_LinePadding / 2, paramTreeviewFooterRect.y * .90f - k_LineHeight , createSimulationRect.width - k_LinePadding, k_LineHeight),
+                    "Create Another Simulation"))
+                {
+                    jobId = "";
+                    doCreateSimulation = false;
+                }
+            }
+            
+            // Create Simulation Form Validations
+            if (string.IsNullOrEmpty(jobName) || !jobNamePatternRegex.IsMatch(jobName))
+            {
+                numErrors++;
+                if (numErrors <= 1)
+                {
+                    showMessage(messageRect, "Name required, must be alphanumeric and less than 100 characters.", kMessageTypeError);
+                }
+
+            } 
+            
+            if (selectedBuild == null)
+            {
+                numErrors++;
+                if (numErrors <= 1)
+                {
+                    showMessage(messageRect, "Build ID required.", kMessageTypeError);
+                }
+
+            } 
+            if (string.IsNullOrEmpty(maxRuns))
+            {
+                numErrors++;
+                if (numErrors <= 1)
+                {
+                    showMessage(messageRect, "Max Number of Runs per Parameter Combination value required.",
+                        kMessageTypeError);
+                }
+            }
+            if (string.IsNullOrEmpty(maxRuntime))
+            {
+                numErrors++;
+                if (numErrors <= 1)
+                {
+                    showMessage(messageRect, "Max Runtime per Run value required.", kMessageTypeError);
+                }
+            }
+            
+            if (hasEmptyParameters)
+            {
+                numErrors++;
+                if (numErrors <= 1)
+                {
+                    showMessage(messageRect, "1 or more Parameter Values required for each parameter.", kMessageTypeError);
+                }
+            }
         }
 
         void DrawScenes()
         {
             selectedScenesCount = 0;
-                var rect = new Rect(0, (float)(1.5 * k_LineHeight), position.width, position.height - (float)(3.5 * k_LineHeight));
+            var rect = new Rect(0, (float)(1.5 * k_LineHeight), position.width, position.height - (float)(3.5 * k_LineHeight));
             var labelRect = new Rect(rect.x, rect.y, rect.width, k_LineHeight);
             var scrollRect = new Rect(labelRect.x, labelRect.y + labelRect.height, rect.width, k_LineHeight * 6);
-
             var scenes = buildSettingsScenes == null || buildSettingsScenes.Length == 0 ? openScenes : buildSettingsScenes;
 
             EditorGUILayout.LabelField(kScenesInBuild, EditorStyles.boldLabel);
             {
-                float minHeight = k_LineHeight;
                 var boxRect = GUILayoutUtility.GetRect(0, kScrollViewWidth, k_LineHeight, k_LineHeight * 10);
-
                 var displayBoxRect = new Rect(boxRect.x + k_LineHeight / 2, boxRect.y, boxRect.width - k_LineHeight, boxRect.height);
                 GUI.Box(displayBoxRect, "", EditorStyles.helpBox);
 
@@ -430,8 +917,9 @@ namespace Unity.Simulation.Games.Editor
             }
         }
 
-
         private readonly Regex buildPatternRegex = new Regex(@"^[a-zA-Z0-9]{2,63}$");
+        private readonly Regex jobNamePatternRegex = new Regex(@"^[a-zA-Z0-9\-]{2,100}$");
+
         void DrawButtons()
         {
             int numberHelpBoxes = 0;
@@ -503,6 +991,11 @@ namespace Unity.Simulation.Games.Editor
             {
                 var id = GameSimApiClient.instance.UploadBuild(buildName, zippedBuildFile, metrics.metrics);
                 Debug.Log($"Build {buildName} uploaded with build id {id}");
+                
+                EditorGUILayout.HelpBox(
+                    $"Build {buildName} uploaded with build id {id}",
+                    MessageType.Info);
+                
             }
 
             if (lastBuildReport != null && lastBuildReport.summary.result != BuildResult.Succeeded)
@@ -691,7 +1184,11 @@ namespace Unity.Simulation.Games.Editor
             
             metrics = null;
             metricsEditor = null;
+            EditorPrefs.DeleteKey("isEntitled");
         }
     }
+    
+   
 
 }
+

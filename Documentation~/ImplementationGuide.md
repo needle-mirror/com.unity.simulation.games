@@ -13,11 +13,12 @@ To implement the Game Simulation package:
 These steps are described below.
 
 ## Step 1. Install the Game Simulation package
-To download the Game Simulation package, add the following line to your project's dependencies in your `manifest.json` file: `"com.unity.simulation.games": "0.4.5-preview.3",`
+To download the Game Simulation package, add the following line to your project's dependencies in your `manifest.json` file: `"com.unity.simulation.games": "0.4.6-preview.1",`
 
 Unity Game Simulation requires the following package versions, and pulls them into your project as dependencies:
 * Remote Config: `"com.unity.remote-config" : "1.4.0-preview.1"`
 * USim: `"com.unity.simulation.core" : "0.0.10-preview.18"`
+* SettingsManager: `"com.unity.settings-manager" : "1.0.3"`
 
 If your project also requires these packages, use the versions listed above. The Game Simulation team publishes notifications on updates to dependent versions in Unity Game Simulation's release notes.
 
@@ -29,10 +30,10 @@ If your project also requires these packages, use the versions listed above. The
 2. Add an entry for each parameter that you want to test with Game Simulation.
    - Choose a name, type, and default value for each parameter.<br />**Note**: Use a valid default value. This is used during Build Verification to ensure the build is working properly when you upload it to Game Simulation.
 3. Click **Save** when done.<br />
-**Note**: Game Simulation updates the values for these parameters in each simulation instance, based on the options specified in the Game Simulation web UI. If your build runs outside of Game Simulation, these parameters use the value from the **Default Value** field. For each parameter, set a default value that's appropriate for the context of the application. 
+**Note**: Game Simulation updates the values for these parameters in each simulation instance, based on the options specified in the Game Simulation web UI. If your build runs outside of Game Simulation, these parameters use the value from the **Default Value** field. For each parameter, set a default value that's appropriate for the context of the application.
 
 ## Step 3. Load parameters for grid search
-Before each run of your simulation, Game Simulation decides on a set of parameter values to evaluate. At runtime, your game must retrieve the set of parameter values for evaluation and then set variables in your game to those values. To fetch the parameter values, call `GameSimManager.Instance.FetchConfig(Action<GameSimConfigResponse>)`. This is included in the Game Simulation package. 
+Before each run of your simulation, Game Simulation decides on a set of parameter values to evaluate. At runtime, your game must retrieve the set of parameter values for evaluation and then set variables in your game to those values. To fetch the parameter values, call `GameSimManager.Instance.FetchConfig(Action<GameSimConfigResponse>)`. This is included in the Game Simulation package.
 
 To load parameters into your game:
 1. Ensure you can access the Game Simulation types with `using Unity.Simulation.Games;`.
@@ -41,7 +42,7 @@ To load parameters into your game:
 `GameSimConfigResponse.Get[variable type]("key name");`
 
 ## Step 4. Enable metrics tracking
-Game Simulation uses a counter to track metrics throughout each run of your game. You can set, increase, and reset a counter's value at any point of your game code. You can also take a snapshot of all the counters with a label at a specific point. For example, when a level or a session completes. You can also snapshot a counter at a specific time interval. The minimum interval is 15 seconds. 
+Game Simulation uses a counter to track metrics throughout each run of your game. You can set, increase, and reset a counter's value at any point of your game code. You can also take a snapshot of all the counters with a label at a specific point. For example, when a level or a session completes. You can also snapshot a counter at a specific time interval. The minimum interval is 15 seconds.
 
 When the simulation completes, you can download these metrics in both raw and aggregated forms from the Game Simulation [Dashboard](https://gamesimulation.unity3d.com).
 
@@ -49,7 +50,7 @@ When the simulation completes, you can download these metrics in both raw and ag
 ### Example implementation
 This example uses a racing game that tracks lap count and finishing time.
 
-#### Call `IncrementCounter` or `SetCounter` to update counter values 
+#### Call `IncrementCounter` or `SetCounter` to update counter values
 
 If Unity doesn't find a counter with the supplied `name`, Unity creates the counter, initializes it to 0, then either increments or sets it as appropriate.
 ```
@@ -100,7 +101,7 @@ In this example, say you want to take snapshot of the lap count every 15 seconds
 ## Step 5. Test your implementation
 1. Build the game targeted to your operating system with the Game Simulation SDK implemented. Unity Game Simulation requires the following symbol defined: `UNITY_GAME_SIMULATION`.
 2. Run the executable and verify that your gameplay script or bot plays through the game with no external input and quits on its own.
-3. Verify that there is a file called `counters_0.json` in your system’s default `Application.persistentDataPath`. If you are using a Mac, this should be `~/Library/Application Support/Unity Technologies/`. For details on other operating systems, see the [Application.persistentDataPath](https://docs.unity3d.com/ScriptReference/Application-persistentDataPath.html) documentation. 
+3. Verify that there is a file called `counters_0.json` in your system’s default `Application.persistentDataPath`. If you are using a Mac, this should be `~/Library/Application Support/Unity Technologies/`. For details on other operating systems, see the [Application.persistentDataPath](https://docs.unity3d.com/ScriptReference/Application-persistentDataPath.html) documentation.
 
 ## Step 6. Upload your build to Game Simulation
 1. In the Project Settings window (**Edit** > **Project Settings**), select **Player** in the menu. Enable **Run in Background** and set **Display Resolution Dialog** to "Disabled".
@@ -110,12 +111,12 @@ In this example, say you want to take snapshot of the lap count every 15 seconds
 5. Select the scenes to include in your build.
 6. Name your build.
 7. Click **Build and Upload**.
-8. Click **Create Simulation** (or navigate directly to the [Dashboard](https://gamesimulation.unity3d.com)) to run a simulation from the Web UI. 
+8. Click **Create Simulation** (or navigate directly to the [Dashboard](https://gamesimulation.unity3d.com)) to run a simulation from the Web UI.
 
 To execute a simulation from the dashboard, your Unity organization must be on the free tier. Unity Game Simulation is free to use within certain limits: you get 500 free playthrough hours. For details and other conditions, see [Unity Game Simulation](https://unity.com/products/game-simulation). In other words, to execute a simulation from your dashboard, you must have gone through registration for Game Simulation, which is usually complete about one week after you sign up. If you receive a "Maximum Simulation Minutes Exceeded" warning in the dashboard, please email [gamesimulation@unity3d.com](mailto:gamesimulation@unity3d.com).
 
-## Step 7. Access the dashboard
-See the [Dashboard Guide](https://unity-technologies.github.io/gamesimulation/Docs/Dashboard.html).
+## Step 7. Create and Run your simulation
+Create an run a grid search simulation from the editor window 'Create Simulation' Tab, or see the [Dashboard Guide](https://unity-technologies.github.io/gamesimulation/Docs/Dashboard.html) for instructions on how to create and run simulations from the web UI.
 
 ## GameSim APIs
 For more information on the GameSim APIs, see the [GameSim APIs documentation](https://unity-technologies.github.io/gamesimulation/Docs/gamesim-apis.html).
